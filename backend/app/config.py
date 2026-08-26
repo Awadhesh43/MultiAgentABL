@@ -33,6 +33,10 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 DEFAULT_MODEL = os.environ.get("ABL_AGENT_MODEL", "claude-sonnet-5")
 
 CORS_ORIGINS = [
-    "http://localhost:4200",
-    "http://127.0.0.1:4200",
+    origin.strip()
+    for origin in os.environ.get(
+        "CORS_ORIGINS",
+        "http://localhost:4200,http://127.0.0.1:4200",
+    ).split(",")
+    if origin.strip()
 ]
