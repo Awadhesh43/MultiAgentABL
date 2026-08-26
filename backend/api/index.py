@@ -36,6 +36,25 @@ def deals():
 def documents():
     return rows('documents', 'ORDER BY uploaded_at DESC')
 
+@app.get('/api/pending-changes/roles')
+def pending_roles():
+    return ['Credit Officer', 'Portfolio Manager', 'Operations Analyst', 'Relationship Manager']
+
+@app.get('/api/pending-changes')
+def pending_changes(status: str | None = None, deal_id: str | None = None):
+    query = 'SELECT * FROM pending_changes'
+    filters = []
+    values = []
+    if status:
+        filters.append('status = ?'); values.append(status)
+    if deal_id:
+        filters.append('deal_id = ?'); values.append(deal_id)
+    if filters: query += ' WHERE ' + ' AND '.join(filters)
+    query += ' ORDER BY created_at DESC'
+    with sqlite3.connect(DB) as conn:
+        conn.row_factory = sqlite3.Row
+        return [dict(row) for row in conn.execute(query, values).fetchall()]
+
 @app.get('/api/dashboard')
 def dashboard():
     deal_rows = rows('deals', 'ORDER BY borrower_name')
