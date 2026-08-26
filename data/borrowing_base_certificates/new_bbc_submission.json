@@ -1,0 +1,24 @@
+{
+  "deal_id": "meridian-apparel-001",
+  "period_end": "2026-08-14",
+  "scenario_note": "Meridian charged off the Fenwick Retail Group balance this week after Fenwick filed for bankruptcy protection, and separately requested an incremental $1,500,000 draw to cover a seasonal inventory buy. This is the raw, uncalculated submission for the Borrowing Base agent to process live.",
+  "gross_ar": 11600000,
+  "ar_ineligibles": {
+    "aging_90": 520000,
+    "cross_aged": 410000,
+    "concentration": 260000,
+    "contra": 90000,
+    "foreign": 0,
+    "government": 0,
+    "related_party": 0
+  },
+  "inventory_at_cost": 9050000,
+  "ineligible_inventory": 1300000,
+  "nolv_pct_of_cost": 0.68,
+  "trailing_gross_sales": 20600000,
+  "trailing_credits_discounts_writeoffs": 1480000,
+  "rent_reserve": 150000,
+  "current_outstanding_balance": 9500000,
+  "letters_of_credit": 250000,
+  "requested_incremental_draw": 1500000
+}

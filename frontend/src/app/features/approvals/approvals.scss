@@ -1,0 +1,93 @@
+.page-header h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+}
+.subtitle {
+  margin: 0 0 1.25rem;
+  color: var(--mat-sys-on-surface-variant, #5a6570);
+  font-size: 0.92rem;
+}
+
+.filters {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 4rem 0;
+}
+
+.change-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.change-card {
+  padding: 1rem 1.25rem;
+}
+
+.change-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.change-title {
+  display: flex;
+  flex-direction: column;
+}
+.deal-link {
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--mat-sys-primary, #2f6fa6);
+}
+.stage-label {
+  font-size: 0.75rem;
+  color: var(--mat-sys-on-surface-variant, #5a6570);
+}
+
+.change-body {
+  margin-top: 0.5rem;
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.field { font-weight: 600; }
+.arrow { color: var(--mat-sys-on-surface-variant, #5a6570); font-size: 0.88rem; }
+
+.rationale {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin: 0.5rem 0;
+}
+
+.change-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.75rem;
+  color: var(--mat-sys-on-surface-variant, #5a6570);
+}
+
+.change-actions {
+  margin-top: 0.7rem;
+}
+
+.decision-notes {
+  font-size: 0.8rem;
+  font-style: italic;
+  margin: 0.5rem 0 0;
+}
+
+.empty {
+  color: var(--mat-sys-on-surface-variant, #5a6570);
+  padding: 2rem 0;
+  text-align: center;
+}

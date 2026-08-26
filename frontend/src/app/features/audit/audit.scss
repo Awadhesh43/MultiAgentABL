@@ -1,0 +1,107 @@
+.page-header h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+}
+.subtitle {
+  margin: 0 0 1.25rem;
+  color: var(--mat-sys-on-surface-variant, #5a6570);
+  font-size: 0.92rem;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 4rem 0;
+}
+
+.chain-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+
+  &.valid {
+    background: var(--guardrail-pass-bg);
+    color: var(--guardrail-pass);
+  }
+  &.invalid {
+    background: var(--guardrail-blocked-bg);
+    color: var(--guardrail-blocked);
+    font-weight: 700;
+  }
+}
+
+.search-field {
+  width: 100%;
+  max-width: 420px;
+  margin-bottom: 1rem;
+}
+
+.audit-table {
+  background: var(--mat-sys-surface-container-low, #fff);
+  border-radius: 10px;
+  overflow-x: auto;
+}
+
+.audit-head, .audit-entry {
+  display: grid;
+  grid-template-columns: 165px 150px 170px 140px 1fr 110px;
+  gap: 0.75rem;
+  padding: 0.55rem 1rem;
+  min-width: 900px;
+  align-items: center;
+}
+
+.audit-head {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--mat-sys-on-surface-variant, #5a6570);
+  border-bottom: 1px solid var(--mat-sys-outline-variant, #e2e5e9);
+}
+
+.audit-entry {
+  font-size: 0.82rem;
+  border-bottom: 1px solid var(--mat-sys-outline-variant, #eceef0);
+
+  a {
+    color: var(--mat-sys-primary, #2f6fa6);
+    text-decoration: none;
+    font-weight: 600;
+  }
+}
+
+.ts { color: var(--mat-sys-on-surface-variant, #5a6570); }
+
+.evt {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  padding: 0.1em 0.5em;
+  border-radius: 5px;
+  width: fit-content;
+}
+.evt-approve { background: var(--guardrail-pass-bg); color: var(--guardrail-pass); }
+.evt-reject { background: var(--guardrail-blocked-bg); color: var(--guardrail-blocked); }
+.evt-flag { background: var(--guardrail-warn-bg); color: var(--guardrail-warn); }
+.evt-default { background: var(--mat-sys-surface-container, #f2f4f6); color: var(--mat-sys-on-surface-variant, #5a6570); }
+
+.summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hash {
+  color: var(--mat-sys-on-surface-variant, #8a949d);
+  font-size: 0.75rem;
+}
+
+.empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--mat-sys-on-surface-variant, #5a6570);
+}

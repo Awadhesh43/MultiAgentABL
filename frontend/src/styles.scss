@@ -1,0 +1,103 @@
+@use '@angular/material' as mat;
+
+html {
+  height: 100%;
+  @include mat.theme(
+    (
+      color: (
+        primary: mat.$azure-palette,
+        tertiary: mat.$orange-palette,
+      ),
+      typography: (
+        plain-family: 'IBM Plex Sans',
+        brand-family: 'IBM Plex Sans',
+        bold-weight: 600,
+        medium-weight: 500,
+        regular-weight: 400,
+      ),
+      density: 0,
+    )
+  );
+}
+
+:root {
+  --guardrail-pass: #1b6e5b;
+  --guardrail-pass-bg: #e0f2ee;
+  --guardrail-warn: #9a6a00;
+  --guardrail-warn-bg: #fdf0d6;
+  --guardrail-elevated: #7a3ea1;
+  --guardrail-elevated-bg: #f1e6f7;
+  --guardrail-blocked: #a6342a;
+  --guardrail-blocked-bg: #fbe3e0;
+
+  --status-pending: #616b76;
+  --status-pending-bg: #eceff2;
+  --status-approved: #1b6e5b;
+  --status-approved-bg: #e0f2ee;
+  --status-rejected: #a6342a;
+  --status-rejected-bg: #fbe3e0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  color-scheme: light;
+  background-color: var(--mat-sys-surface-container-lowest, #f5f6f8);
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-body-medium);
+  font-family: 'IBM Plex Sans', Roboto, sans-serif;
+  margin: 0;
+  height: 100%;
+}
+
+code, .mono {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+a {
+  color: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 6px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  padding: 0.22em 0.6em;
+  border-radius: 999px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge-pass { color: var(--guardrail-pass); background: var(--guardrail-pass-bg); }
+.badge-warn { color: var(--guardrail-warn); background: var(--guardrail-warn-bg); }
+.badge-elevated { color: var(--guardrail-elevated); background: var(--guardrail-elevated-bg); }
+.badge-blocked { color: var(--guardrail-blocked); background: var(--guardrail-blocked-bg); }
+
+.badge-pending { color: var(--status-pending); background: var(--status-pending-bg); }
+.badge-approved { color: var(--status-approved); background: var(--status-approved-bg); }
+.badge-rejected { color: var(--status-rejected); background: var(--status-rejected-bg); }
+
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1.75rem clamp(1rem, 3vw, 2rem) 4rem;
+}
+
+.mono-num {
+  font-variant-numeric: tabular-nums;
+  font-family: 'IBM Plex Mono', monospace;
+}

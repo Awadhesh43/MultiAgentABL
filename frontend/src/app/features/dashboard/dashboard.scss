@@ -1,0 +1,80 @@
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 1.5rem;
+
+  h1 {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-weight: 700;
+    font-size: 1.6rem;
+    margin: 0 0 0.25rem;
+  }
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant, #5a6570);
+  font-size: 0.92rem;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 4rem 0;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  background: var(--mat-sys-surface-container-low, #fff);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 14px -8px rgba(0, 0, 0, 0.18);
+}
+
+.deal-table {
+  width: 100%;
+  min-width: 860px;
+}
+
+.deal-row {
+  cursor: pointer;
+  &:hover {
+    background: var(--mat-sys-surface-container, #f2f4f6);
+  }
+}
+
+.borrower-cell {
+  display: flex;
+  flex-direction: column;
+  .name {
+    font-weight: 600;
+  }
+  .industry {
+    font-size: 0.78rem;
+    color: var(--mat-sys-on-surface-variant, #5a6570);
+  }
+}
+
+.rating {
+  font-weight: 600;
+  padding: 0.15em 0.55em;
+  border-radius: 6px;
+  font-size: 0.82rem;
+}
+.rating-pass { color: var(--guardrail-pass); background: var(--guardrail-pass-bg); }
+.rating-watch { color: var(--guardrail-warn); background: var(--guardrail-warn-bg); }
+.rating-classified { color: var(--guardrail-blocked); background: var(--guardrail-blocked-bg); }
+
+.watchlist-icon {
+  vertical-align: middle;
+  margin-left: 0.35em;
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: var(--guardrail-warn);
+}
+
+.negative {
+  color: var(--guardrail-blocked);
+  font-weight: 600;
+}

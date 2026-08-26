@@ -1,0 +1,80 @@
+{
+  "deal_id": "meridian-apparel-001",
+  "borrower": {
+    "name": "Meridian Apparel Group, Inc.",
+    "industry": "Wholesale apparel distribution",
+    "naics": "424330",
+    "hq": "Charlotte, NC",
+    "sponsor": "Kestrel Capital Partners"
+  },
+  "facility": {
+    "type": "Senior secured ABL revolver",
+    "commitment": 15000000,
+    "closing_date": "2024-03-15",
+    "maturity_date": "2027-03-15",
+    "ar_advance_rate": 0.85,
+    "inventory_advance_rate_nolv": 0.85,
+    "inventory_cost_cap_pct": 0.6,
+    "dilution_threshold_pct": 0.05,
+    "excess_availability_trigger_pct": 0.1,
+    "excess_availability_trigger_floor": 2000000,
+    "fccr_minimum": 1.1,
+    "cure_period_days": 60,
+    "reporting": {
+      "bbc_frequency": "weekly",
+      "financials_frequency": "monthly",
+      "financials_due_days": 25
+    }
+  },
+  "stage": "servicing_and_monitoring",
+  "risk_rating": "Pass",
+  "watchlist": false,
+  "outstanding_balance": 11000000,
+  "letters_of_credit": 250000,
+  "financials": {
+    "as_of": "2026-06-30",
+    "trailing_revenue": 48500000,
+    "trailing_ebitda": 4650000,
+    "unfinanced_capex": 380000,
+    "cash_taxes_paid": 210000,
+    "distributions": 0,
+    "scheduled_debt_service": 900000,
+    "annual_rent_and_leases": 1150000
+  },
+  "field_exam_history": [
+    {
+      "date": "2024-02-20",
+      "type": "Initial (pre-closing)",
+      "result": "Clean, no material exceptions"
+    },
+    {
+      "date": "2024-11-08",
+      "type": "Annual",
+      "result": "Minor exception: 2 consigned SKUs at 3PL not flagged ineligible; corrected"
+    },
+    {
+      "date": "2025-11-14",
+      "type": "Annual",
+      "result": "Clean"
+    }
+  ],
+  "nolv_appraisal_history": [
+    {
+      "date": "2024-02-10",
+      "nolv_pct_of_cost": 0.71
+    },
+    {
+      "date": "2025-01-22",
+      "nolv_pct_of_cost": 0.695
+    },
+    {
+      "date": "2026-01-20",
+      "nolv_pct_of_cost": 0.68
+    }
+  ],
+  "governance": {
+    "authority_level_for_facility": "Senior Credit Officer",
+    "last_annual_review": "2026-03-01",
+    "next_annual_review_due": "2027-03-01"
+  }
+}

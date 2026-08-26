@@ -1,0 +1,87 @@
+.app-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  gap: 0.5rem;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-right: 1.5rem;
+}
+
+.brand-mark {
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: rgba(255, 255, 255, 0.16);
+  padding: 0.15em 0.5em;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.brand-name {
+  font-weight: 600;
+  font-size: 1.02rem;
+  white-space: nowrap;
+}
+
+.nav-links {
+  display: flex;
+  gap: 0.15rem;
+
+  a.active {
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 6px;
+  }
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.session-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.session-label {
+  font-size: 0.85rem;
+}
+
+.session-menu-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem 1rem 0.75rem;
+  width: 260px;
+}
+
+.session-field {
+  width: 100%;
+}
+
+.session-hint {
+  font-size: 0.72rem;
+  opacity: 0.65;
+  margin: 0.25rem 0 0;
+  line-height: 1.4;
+}
+
+.app-main {
+  min-height: calc(100vh - 64px);
+}
+
+@media (max-width: 900px) {
+  .brand-name, .session-label {
+    display: none;
+  }
+  .nav-links {
+    font-size: 0.85rem;
+  }
+}
