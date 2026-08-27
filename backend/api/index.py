@@ -24,7 +24,7 @@ if SOURCE_DB.exists() and (not DB.exists() or DB.stat().st_size == 0):
     shutil.copyfile(SOURCE_DB, DB)
 
 app = FastAPI(title='Agentic ABL Platform API', version='0.1.0')
-DATABASE_URL = next((os.environ.get(name) for name in ('POSTGRES_URL_NON_POOLING', 'POSTGRES_URL', 'DATABASE_URL', 'POSTGRES_PRISMA_URL') if (os.environ.get(name) or '').strip().strip('"').strip("'").startswith(('postgres://', 'postgresql://'))), None)
+DATABASE_URL = next((os.environ.get(name) for name in ('POSTGRES_URL', 'DATABASE_URL', 'POSTGRES_PRISMA_URL', 'POSTGRES_URL_NON_POOLING') if (os.environ.get(name) or '').strip().strip('"').strip("'").startswith(('postgres://', 'postgresql://'))), None)
 if not DATABASE_URL:
     raise RuntimeError('A Neon PostgreSQL connection variable must be configured')
 DATABASE_URL = DATABASE_URL.strip().strip('"').strip("'")
