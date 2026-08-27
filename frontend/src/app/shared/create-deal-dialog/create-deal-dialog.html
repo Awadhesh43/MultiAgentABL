@@ -1,0 +1,69 @@
+<h2 mat-dialog-title>Create deal</h2>
+
+<mat-dialog-content class="content">
+  <p class="intro">
+    Starts the deal at Origination with everything else -- advance rates, financials, risk rating -- left at
+    the same starting defaults a fresh prospect gets. Choosing an existing borrower still creates a new,
+    separate deal for them; it only reuses their name and industry.
+  </p>
+
+  <div class="field-group">
+    <mat-form-field appearance="outline" [class.has-error]="borrowerNameError()">
+      <mat-label>Borrower name</mat-label>
+      <input
+        matInput
+        [ngModel]="borrowerName()"
+        (ngModelChange)="onBorrowerNameChange($event)"
+        (blur)="onBorrowerNameBlur()"
+        [matAutocomplete]="borrowerAuto"
+        placeholder="Type a new borrower, or pick an existing one"
+      />
+      <mat-autocomplete #borrowerAuto="matAutocomplete" (optionSelected)="onBorrowerOptionSelected($event)">
+        @for (b of filteredBorrowers(); track b.name) {
+          <mat-option [value]="b.name">
+            <span>{{ b.name }}</span>
+            <span class="option-industry">{{ b.industry }}</span>
+          </mat-option>
+        }
+      </mat-autocomplete>
+    </mat-form-field>
+    @if (borrowerNameError()) {
+      <p class="field-error">Borrower name is required.</p>
+    } @else if (matchedExistingBorrower()) {
+      <p class="field-hint">Existing borrower -- industry filled in below. This still creates a new deal.</p>
+    }
+  </div>
+
+  <div class="field-group">
+    <mat-form-field appearance="outline">
+      <mat-label>Industry</mat-label>
+      <input matInput [ngModel]="industry()" (ngModelChange)="industry.set($event)" placeholder="e.g. Metal fabrication & structural steel" />
+    </mat-form-field>
+  </div>
+
+  <div class="field-group">
+    <mat-form-field appearance="outline" [class.has-error]="dealNameError()">
+      <mat-label>Deal name</mat-label>
+      <input matInput [ngModel]="dealName()" (ngModelChange)="dealName.set($event)" [placeholder]="dealNamePlaceholder" />
+    </mat-form-field>
+    @if (dealNameError()) {
+      <p class="field-error">Deal name is required.</p>
+    }
+  </div>
+
+  <div class="field-group">
+    <mat-form-field appearance="outline" [class.has-error]="commitmentError()">
+      <mat-label>Requested / commitment amount</mat-label>
+      <span matTextPrefix>$&nbsp;</span>
+      <input matInput type="number" min="0" step="100000" [ngModel]="commitment()" (ngModelChange)="commitment.set($event)" placeholder="9,500,000" />
+    </mat-form-field>
+    @if (commitmentError()) {
+      <p class="field-error">Enter an amount greater than zero.</p>
+    }
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="cancel()">Cancel</button>
+  <button mat-flat-button color="primary" (click)="submit()">Create deal</button>
+</mat-dialog-actions>

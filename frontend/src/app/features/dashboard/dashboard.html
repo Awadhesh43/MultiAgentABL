@@ -2,34 +2,46 @@
   <header class="page-header">
     <div>
       <h1>Portfolio</h1>
-      <p class="subtitle">Every seeded deal, spanning origination through workout. Click a row for the full lifecycle view.</p>
+      <p class="subtitle">Every deal, spanning origination through workout. Click a row for the full lifecycle view, or a column header to sort.</p>
     </div>
+    <button mat-flat-button color="primary" (click)="createDeal()">
+      <mat-icon>add</mat-icon> Create deal
+    </button>
   </header>
 
   @if (loading()) {
     <div class="loading"><mat-spinner diameter="32"></mat-spinner></div>
   } @else {
     <div class="table-wrap">
-      <table mat-table [dataSource]="deals()" class="deal-table">
+      <table
+        mat-table [dataSource]="sortedDeals()" class="deal-table"
+        matSort matSortActive="created" matSortDirection="desc" (matSortChange)="onSortChange($event)"
+      >
         <ng-container matColumnDef="borrower">
-          <th mat-header-cell *matHeaderCellDef>Borrower</th>
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Borrower</th>
           <td mat-cell *matCellDef="let d">
             <div class="borrower-cell">
               <span class="name">{{ d.borrower_name }}</span>
+              <span class="deal-name">{{ d.deal_name }}</span>
               <span class="industry">{{ d.industry }}</span>
             </div>
           </td>
         </ng-container>
 
+        <ng-container matColumnDef="created">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Created</th>
+          <td mat-cell *matCellDef="let d" class="mono-num">{{ d.created_at | date: 'MMM d, y' }}</td>
+        </ng-container>
+
         <ng-container matColumnDef="stage">
-          <th mat-header-cell *matHeaderCellDef>Stage</th>
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Stage</th>
           <td mat-cell *matCellDef="let d">
             <mat-chip-set><mat-chip>{{ stageLabel(d.stage) }}</mat-chip></mat-chip-set>
           </td>
         </ng-container>
 
         <ng-container matColumnDef="risk_rating">
-          <th mat-header-cell *matHeaderCellDef>Risk rating</th>
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Risk rating</th>
           <td mat-cell *matCellDef="let d">
             <span class="rating" [class]="ratingClass(d.risk_rating)">{{ d.risk_rating }}</span>
             @if (d.watchlist) {
@@ -39,21 +51,21 @@
         </ng-container>
 
         <ng-container matColumnDef="availability">
-          <th mat-header-cell *matHeaderCellDef>Availability</th>
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Availability</th>
           <td mat-cell *matCellDef="let d" class="mono-num" [class.negative]="d.latest_availability < 0">
             {{ d.latest_availability | currency: 'USD':'symbol':'1.0-0' }}
           </td>
         </ng-container>
 
         <ng-container matColumnDef="outstanding">
-          <th mat-header-cell *matHeaderCellDef>Outstanding / Commitment</th>
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Outstanding / Commitment</th>
           <td mat-cell *matCellDef="let d" class="mono-num">
             {{ d.outstanding_balance | currency: 'USD':'symbol':'1.0-0' }} / {{ d.commitment | currency: 'USD':'symbol':'1.0-0' }}
           </td>
         </ng-container>
 
         <ng-container matColumnDef="pending">
-          <th mat-header-cell *matHeaderCellDef>HITL queue</th>
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>HITL queue</th>
           <td mat-cell *matCellDef="let d">
             @if (pendingCount(d.id) > 0) {
               <span class="badge badge-elevated">{{ pendingCount(d.id) }} pending</span>

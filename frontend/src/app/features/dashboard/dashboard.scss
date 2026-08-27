@@ -33,7 +33,7 @@
 
 .deal-table {
   width: 100%;
-  min-width: 860px;
+  min-width: 980px;
 }
 
 .deal-row {
@@ -48,6 +48,10 @@
   flex-direction: column;
   .name {
     font-weight: 600;
+  }
+  .deal-name {
+    font-size: 0.78rem;
+    color: var(--mat-sys-primary, #2f6fa6);
   }
   .industry {
     font-size: 0.78rem;

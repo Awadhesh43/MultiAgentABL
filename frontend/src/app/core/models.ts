@@ -1,6 +1,7 @@
 export interface DealSummary {
   id: string;
   borrower_name: string;
+  deal_name: string;
   industry: string;
   stage: string;
   risk_rating: string;
@@ -10,6 +11,15 @@ export interface DealSummary {
   outstanding_balance: number;
   latest_borrowing_base: number;
   latest_availability: number;
+  created_at: string;
+}
+
+export interface DealCreate {
+  borrower_name: string;
+  deal_name: string;
+  industry: string;
+  commitment: number;
+  created_by: string;
 }
 
 export interface DealDetail extends DealSummary {

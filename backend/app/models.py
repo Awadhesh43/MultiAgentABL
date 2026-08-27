@@ -29,6 +29,7 @@ class Deal(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     borrower_name: Mapped[str] = mapped_column(String)
+    deal_name: Mapped[str] = mapped_column(String, default="")
     industry: Mapped[str] = mapped_column(String)
     naics: Mapped[str] = mapped_column(String, default="")
     hq: Mapped[str] = mapped_column(String, default="")

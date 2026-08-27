@@ -1,20 +1,76 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+import re
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from abl_agents import calculations
 
-from .. import crud, schemas
+from .. import audit, crud, schemas
 from ..db import get_db
 from ..models import BorrowingBaseCertificate, Deal, StageEvent
 
 router = APIRouter(prefix="/api/deals", tags=["deals"])
 
 
+def _slugify(text: str, max_len: int = 30) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+    return slug[:max_len].rstrip("-") or "deal"
+
+
 @router.get("", response_model=list[schemas.DealSummary])
 def list_deals(db: Session = Depends(get_db)):
     return db.query(Deal).order_by(Deal.borrower_name).all()
+
+
+@router.post("", response_model=schemas.DealDetail)
+def create_deal(body: schemas.DealCreate, db: Session = Depends(get_db)):
+    """Origination intake: the only fields a new deal starts with are what a
+    relationship manager actually knows on day one -- who the borrower is,
+    what to call the deal, roughly what they're asking for, and (if this
+    borrower already has a deal on file) its industry. Everything else
+    (advance rates, financials, risk rating) takes its column default, the
+    same starting point Harbor Steel Fabricators -- the seeded
+    origination-stage deal -- has, and gets filled in as the deal moves
+    through underwriting and closing.
+    """
+    borrower_name = body.borrower_name.strip()
+    if not borrower_name:
+        raise HTTPException(400, "Borrower name is required.")
+    deal_name = body.deal_name.strip()
+    if not deal_name:
+        raise HTTPException(400, "Deal name is required.")
+    if body.commitment <= 0:
+        raise HTTPException(400, "Requested / commitment amount must be greater than zero.")
+
+    industry = body.industry.strip() or "Not yet specified"
+    deal_id = f"{_slugify(borrower_name)}-{uuid.uuid4().hex[:6]}"
+
+    deal = Deal(
+        id=deal_id,
+        borrower_name=borrower_name,
+        deal_name=deal_name,
+        industry=industry,
+        commitment=body.commitment,
+        stage="origination",
+    )
+    db.add(deal)
+    db.flush()  # assigns created_at/updated_at defaults before the audit entry references deal.id
+
+    db.add(StageEvent(deal_id=deal.id, stage="origination", status="in_progress"))
+
+    audit.append(
+        db, event_type="deal_created", actor=body.created_by, deal_id=deal.id,
+        stage="01 - Origination & Prospecting",
+        summary=f"Created new deal '{deal_name}' for {borrower_name} -- requested commitment ${body.commitment:,.0f}",
+        detail={"deal_id": deal.id, "borrower_name": borrower_name, "deal_name": deal_name, "industry": industry, "commitment": body.commitment},
+    )
+
+    db.commit()
+    db.refresh(deal)
+    return deal
 
 
 @router.get("/{deal_id}", response_model=schemas.DealDetail)

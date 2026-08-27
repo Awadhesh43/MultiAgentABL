@@ -178,6 +178,7 @@ def build_deals(db) -> dict[str, Deal]:
 
     meridian = Deal(
         id="meridian-apparel-001", borrower_name="Meridian Apparel Group, Inc.",
+        deal_name="Meridian Apparel -- $15.0mm ABL Revolver",
         industry="Wholesale apparel distribution", naics="424330", hq="Charlotte, NC", sponsor="Kestrel Capital Partners",
         commitment=15_000_000, closing_date="2024-03-15", maturity_date="2027-03-15",
         ar_advance_rate=0.85, inventory_advance_rate_nolv=0.85, inventory_cost_cap_pct=0.60,
@@ -187,11 +188,12 @@ def build_deals(db) -> dict[str, Deal]:
         latest_borrowing_base=12_876_063.11, latest_availability=1_626_063.11,
         trailing_revenue=48_500_000, trailing_ebitda=4_650_000, unfinanced_capex=380_000, cash_taxes_paid=210_000,
         distributions=0, scheduled_debt_service=900_000, annual_rent_and_leases=1_150_000,
-        authority_level="Credit Officer",
+        authority_level="Credit Officer", created_at=datetime(2024, 2, 20, tzinfo=timezone.utc),
     )
 
     harbor = Deal(
         id="harbor-steel-002", borrower_name="Harbor Steel Fabricators, LLC",
+        deal_name="Harbor Steel -- $8.0mm ABL Revolver (Prospect)",
         industry="Metal fabrication & structural steel", naics="332312", hq="Baytown, TX", sponsor="Independent (family-owned)",
         commitment=8_000_000, closing_date="", maturity_date="",
         ar_advance_rate=0.85, inventory_advance_rate_nolv=0.80, inventory_cost_cap_pct=0.55,
@@ -200,11 +202,12 @@ def build_deals(db) -> dict[str, Deal]:
         outstanding_balance=0, letters_of_credit=0, latest_borrowing_base=0, latest_availability=0,
         trailing_revenue=22_000_000, trailing_ebitda=2_100_000, unfinanced_capex=140_000, cash_taxes_paid=90_000,
         distributions=0, scheduled_debt_service=0, annual_rent_and_leases=310_000,
-        authority_level="Credit Officer",
+        authority_level="Credit Officer", created_at=days_ago(4),
     )
 
     vantage = Deal(
         id="vantage-foods-003", borrower_name="Vantage Foods Distribution, Inc.",
+        deal_name="Vantage Foods -- $12.0mm ABL Revolver",
         industry="Food & beverage distribution", naics="424410", hq="Fresno, CA", sponsor="Meadowbrook Partners",
         commitment=12_000_000, closing_date="", maturity_date="",
         ar_advance_rate=0.85, inventory_advance_rate_nolv=0.80, inventory_cost_cap_pct=0.55,
@@ -213,11 +216,12 @@ def build_deals(db) -> dict[str, Deal]:
         outstanding_balance=0, letters_of_credit=0, latest_borrowing_base=0, latest_availability=0,
         trailing_revenue=61_200_000, trailing_ebitda=5_875_000, unfinanced_capex=610_000, cash_taxes_paid=340_000,
         distributions=0, scheduled_debt_service=0, annual_rent_and_leases=780_000,
-        authority_level="Credit Officer",
+        authority_level="Credit Officer", created_at=days_ago(21),
     )
 
     crestline = Deal(
         id="crestline-furniture-004", borrower_name="Crestline Furniture Co.",
+        deal_name="Crestline Furniture -- $10.0mm ABL Revolver",
         industry="Furniture manufacturing & wholesale", naics="337122", hq="High Point, NC", sponsor="Ashwood Equity Partners",
         commitment=10_000_000, closing_date="", maturity_date="",
         ar_advance_rate=0.85, inventory_advance_rate_nolv=0.75, inventory_cost_cap_pct=0.55,
@@ -226,11 +230,12 @@ def build_deals(db) -> dict[str, Deal]:
         outstanding_balance=0, letters_of_credit=0, latest_borrowing_base=0, latest_availability=0,
         trailing_revenue=27_500_000, trailing_ebitda=2_650_000, unfinanced_capex=210_000, cash_taxes_paid=140_000,
         distributions=0, scheduled_debt_service=0, annual_rent_and_leases=520_000,
-        authority_level="Senior Credit Officer",
+        authority_level="Senior Credit Officer", created_at=days_ago(45),
     )
 
     solstice = Deal(
         id="solstice-auto-005", borrower_name="Solstice Auto Parts, Inc.",
+        deal_name="Solstice Auto Parts -- $20.0mm ABL Revolver",
         industry="Automotive aftermarket parts distribution", naics="423120", hq="Toledo, OH", sponsor="Northfield Capital",
         commitment=20_000_000, closing_date="2023-06-01", maturity_date="2026-06-01",
         ar_advance_rate=0.83, inventory_advance_rate_nolv=0.75, inventory_cost_cap_pct=0.55,
@@ -239,11 +244,12 @@ def build_deals(db) -> dict[str, Deal]:
         outstanding_balance=14_200_000, letters_of_credit=0, latest_borrowing_base=15_100_000, latest_availability=900_000,
         trailing_revenue=39_800_000, trailing_ebitda=2_100_000, unfinanced_capex=250_000, cash_taxes_paid=150_000,
         distributions=0, scheduled_debt_service=1_400_000, annual_rent_and_leases=650_000,
-        authority_level="Senior Credit Officer",
+        authority_level="Senior Credit Officer", created_at=datetime(2023, 5, 10, tzinfo=timezone.utc),
     )
 
     ridgeline = Deal(
         id="ridgeline-outdoor-006", borrower_name="Ridgeline Outdoor Supply Co.",
+        deal_name="Ridgeline Outdoor -- $18.0mm ABL Revolver",
         industry="Outdoor & recreational equipment wholesale", naics="423910", hq="Bozeman, MT", sponsor="Trailhead Capital",
         commitment=18_000_000, closing_date="2022-09-12", maturity_date="2025-09-12",
         ar_advance_rate=0.80, inventory_advance_rate_nolv=0.70, inventory_cost_cap_pct=0.50,
@@ -252,11 +258,12 @@ def build_deals(db) -> dict[str, Deal]:
         outstanding_balance=16_500_000, letters_of_credit=0, latest_borrowing_base=15_800_000, latest_availability=-700_000,
         trailing_revenue=31_000_000, trailing_ebitda=850_000, unfinanced_capex=180_000, cash_taxes_paid=40_000,
         distributions=0, scheduled_debt_service=1_100_000, annual_rent_and_leases=590_000,
-        authority_level="Risk Committee",
+        authority_level="Risk Committee", created_at=datetime(2022, 8, 20, tzinfo=timezone.utc),
     )
 
     palisade = Deal(
         id="palisade-consumer-007", borrower_name="Palisade Consumer Brands, Inc.",
+        deal_name="Palisade Consumer Brands -- $25.0mm ABL Revolver",
         industry="Consumer packaged goods", naics="311999", hq="Denver, CO", sponsor="Summit Ridge Capital",
         commitment=25_000_000, closing_date="2022-04-01", maturity_date="2026-04-01",
         ar_advance_rate=0.85, inventory_advance_rate_nolv=0.82, inventory_cost_cap_pct=0.58,
@@ -265,7 +272,7 @@ def build_deals(db) -> dict[str, Deal]:
         outstanding_balance=8_000_000, letters_of_credit=300_000, latest_borrowing_base=19_500_000, latest_availability=11_200_000,
         trailing_revenue=73_400_000, trailing_ebitda=8_900_000, unfinanced_capex=920_000, cash_taxes_paid=610_000,
         distributions=0, scheduled_debt_service=600_000, annual_rent_and_leases=1_400_000,
-        authority_level="Credit Officer",
+        authority_level="Credit Officer", created_at=datetime(2022, 3, 12, tzinfo=timezone.utc),
     )
 
     for d in [meridian, harbor, vantage, crestline, solstice, ridgeline, palisade]:

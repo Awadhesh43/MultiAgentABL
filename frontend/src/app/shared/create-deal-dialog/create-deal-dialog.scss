@@ -1,0 +1,47 @@
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 420px;
+  max-width: 480px;
+}
+
+.intro {
+  font-size: 0.85rem;
+  color: var(--mat-sys-on-surface-variant, #5a6570);
+  line-height: 1.5;
+  margin: 0 0 0.75rem;
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+mat-form-field {
+  width: 100%;
+}
+
+.has-error {
+  --mdc-outlined-text-field-outline-color: var(--guardrail-blocked, #a6342a);
+  --mdc-outlined-text-field-focus-outline-color: var(--guardrail-blocked, #a6342a);
+}
+
+.field-error {
+  margin: 0 0 0.4rem;
+  font-size: 0.76rem;
+  color: var(--guardrail-blocked, #a6342a);
+}
+
+.field-hint {
+  margin: 0 0 0.4rem;
+  font-size: 0.76rem;
+  color: var(--guardrail-pass, #1b6e5b);
+}
+
+mat-option .option-industry {
+  margin-left: 0.6rem;
+  font-size: 0.78rem;
+  color: var(--mat-sys-on-surface-variant, #5a6570);
+}

@@ -9,6 +9,7 @@ class DealSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str
     borrower_name: str
+    deal_name: str
     industry: str
     stage: str
     risk_rating: str
@@ -18,6 +19,15 @@ class DealSummary(BaseModel):
     outstanding_balance: float
     latest_borrowing_base: float
     latest_availability: float
+    created_at: datetime
+
+
+class DealCreate(BaseModel):
+    borrower_name: str
+    deal_name: str
+    industry: str = ""
+    commitment: float
+    created_by: str = "demo_user"
 
 
 class DealDetail(DealSummary):
@@ -43,7 +53,6 @@ class DealDetail(DealSummary):
     scheduled_debt_service: float
     annual_rent_and_leases: float
     authority_level: str
-    created_at: datetime
     updated_at: datetime
 
 

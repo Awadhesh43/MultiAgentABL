@@ -3,8 +3,8 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import {
   AdvanceStageResponse, ApplyFieldsResponse, ApprovalDecision, AuditEntry, Bbc, BbcSubmission, ChainStatus,
-  DealDetail, DealSummary, DocumentRecord, DocumentType, ExtractedField, KeyTerm, PendingChange, StageEvent,
-  StageRunResponse, WikiChatResponse,
+  DealCreate, DealDetail, DealSummary, DocumentRecord, DocumentType, ExtractedField, KeyTerm, PendingChange,
+  StageEvent, StageRunResponse, WikiChatResponse,
 } from './models';
 
 const BASE = '/api';
@@ -16,6 +16,9 @@ export class Api {
   // deals
   listDeals(): Observable<DealSummary[]> {
     return this.http.get<DealSummary[]>(`${BASE}/deals`);
+  }
+  createDeal(deal: DealCreate): Observable<DealDetail> {
+    return this.http.post<DealDetail>(`${BASE}/deals`, deal);
   }
   getDeal(id: string): Observable<DealDetail> {
     return this.http.get<DealDetail>(`${BASE}/deals/${id}`);
