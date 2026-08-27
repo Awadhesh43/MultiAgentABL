@@ -62,9 +62,6 @@ def ensure_neon_schema():
             id TEXT PRIMARY KEY, deal_id TEXT NOT NULL, stage TEXT NOT NULL, status TEXT NOT NULL, notes TEXT NOT NULL DEFAULT '', entered_at TEXT NOT NULL)'''))
 
 
-ensure_neon_schema()
-
-
 def neon_rows(sql: str, params: dict | None = None):
     with NEON_ENGINE.connect() as conn:
         return [dict(row) for row in conn.execute(text(sql), params or {}).mappings().all()]
