@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import create_engine, text
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME = Path('/tmp/abl-platform') if os.environ.get('VERCEL') else ROOT
@@ -20,6 +21,18 @@ if SOURCE_DB.exists() and (not DB.exists() or DB.stat().st_size == 0):
     shutil.copyfile(SOURCE_DB, DB)
 
 app = FastAPI(title='Agentic ABL Platform API', version='0.1.0')
+NEON_ENGINE = create_engine(os.environ['DATABASE_URL'], pool_pre_ping=True)
+
+
+def neon_rows(sql: str, params: dict | None = None):
+    with NEON_ENGINE.connect() as conn:
+        return [dict(row) for row in conn.execute(text(sql), params or {}).mappings().all()]
+
+
+def neon_one(sql: str, params: dict):
+    with NEON_ENGINE.connect() as conn:
+        row = conn.execute(text(sql), params).mappings().first()
+        return dict(row) if row else None
 app.add_middleware(CORSMiddleware, allow_origins=['*'], allow_credentials=False, allow_methods=['*'], allow_headers=['*'])
 
 def rows(table, where='', params=(), order=''):
@@ -28,10 +41,10 @@ def rows(table, where='', params=(), order=''):
         return [dict(row) for row in conn.execute(f'SELECT * FROM {table} {where} {order}', params).fetchall()]
 
 def ensure_deal(deal_id: str):
-    result = rows('deals', 'WHERE id = ?', (deal_id,))
+    result = neon_one('SELECT * FROM deals WHERE id = :id', {'id': deal_id})
     if not result:
         raise HTTPException(404, 'Deal not found')
-    return result[0]
+    return result
 
 @app.get('/api/health')
 def health():
@@ -39,13 +52,13 @@ def health():
 
 @app.get('/api/dashboard')
 def dashboard():
-    deals = rows('deals', order='ORDER BY borrower_name')
+    deals = neon_rows('SELECT * FROM deals ORDER BY borrower_name')
     documents = rows('documents', order='ORDER BY uploaded_at DESC')
     return {'deals': deals, 'documents': documents, 'deal_count': len(deals), 'document_count': len(documents)}
 
 @app.get('/api/deals')
 def list_deals():
-    return rows('deals', order='ORDER BY borrower_name')
+    return neon_rows('SELECT * FROM deals ORDER BY borrower_name')
 
 @app.post('/api/deals')
 async def create_deal(request: Request):
@@ -58,33 +71,19 @@ async def create_deal(request: Request):
         raise HTTPException(400, 'Borrower name, deal name, and a positive commitment are required')
     deal_id = f"{re.sub(r'[^a-z0-9]+', '-', borrower_name.lower()).strip('-')[:30] or 'deal'}-{uuid.uuid4().hex[:6]}"
     timestamp = datetime.now(timezone.utc).isoformat()
-    columns = rows('deals', 'LIMIT 1')
-    if not columns:
-        raise HTTPException(500, 'Deals table is unavailable')
-    with sqlite3.connect(DB) as conn:
-        conn.execute(
-            f'''INSERT INTO deals (
-                id, borrower_name, deal_name, industry, naics, hq, sponsor,
-                facility_type, commitment, closing_date, maturity_date,
-                ar_advance_rate, inventory_advance_rate_nolv, inventory_cost_cap_pct,
-                dilution_threshold_pct, excess_availability_trigger_pct,
-                excess_availability_trigger_floor, fccr_minimum, stage, risk_rating,
-                watchlist, covenant_status, outstanding_balance, letters_of_credit,
-                latest_borrowing_base, latest_availability, trailing_revenue,
-                trailing_ebitda, unfinanced_capex, cash_taxes_paid, distributions,
-                scheduled_debt_service, annual_rent_and_leases, authority_level, created_at, updated_at
-            ) VALUES ({', '.join('?' for _ in range(36))})''', 
-            (deal_id, borrower_name, deal_name, industry, str(body.get('naics', '')), str(body.get('hq', '')),
-             str(body.get('sponsor', '')), str(body.get('facility_type', 'Senior secured ABL revolver')),
-             commitment, str(body.get('closing_date', '')), str(body.get('maturity_date', '')),
-             0.85, 0.85, 0.60, 0.05, 0.10, 2000000, 1.10, 'origination', 'Pass', 0,
-             'not_yet_tested', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'Credit Officer', timestamp, timestamp),
-        )
-        conn.execute(
-            'INSERT INTO stage_events (id, deal_id, stage, status, notes, entered_at) VALUES (?, ?, ?, ?, ?, ?)',
-            (uuid.uuid4().hex[:12], deal_id, 'origination', 'in_progress', '', timestamp),
-        )
-        conn.commit()
+    params = {'id': deal_id, 'borrower_name': borrower_name, 'deal_name': deal_name, 'industry': industry,
+              'naics': str(body.get('naics', '')), 'hq': str(body.get('hq', '')), 'sponsor': str(body.get('sponsor', '')),
+              'facility_type': str(body.get('facility_type', 'Senior secured ABL revolver')), 'commitment': commitment,
+              'closing_date': str(body.get('closing_date', '')), 'maturity_date': str(body.get('maturity_date', '')),
+              'created_at': timestamp, 'updated_at': timestamp}
+    with NEON_ENGINE.begin() as conn:
+        conn.execute(text('''INSERT INTO deals (id, borrower_name, deal_name, industry, naics, hq, sponsor, facility_type,
+            commitment, closing_date, maturity_date, created_at, updated_at) VALUES
+            (:id, :borrower_name, :deal_name, :industry, :naics, :hq, :sponsor, :facility_type, :commitment,
+            :closing_date, :maturity_date, :created_at, :updated_at)'''), params)
+        conn.execute(text('''INSERT INTO stage_events (id, deal_id, stage, status, notes, entered_at)
+            VALUES (:event_id, :deal_id, 'origination', 'in_progress', '', :entered_at)'''),
+                     {'event_id': uuid.uuid4().hex[:12], 'deal_id': deal_id, 'entered_at': timestamp})
     return ensure_deal(deal_id)
 
 @app.get('/api/deals/{deal_id}')
@@ -94,7 +93,7 @@ def get_deal(deal_id: str):
 @app.get('/api/deals/{deal_id}/stage-events')
 def stage_events(deal_id: str):
     ensure_deal(deal_id)
-    return rows('stage_events', 'WHERE deal_id = ?', (deal_id,), 'ORDER BY entered_at ASC')
+    return neon_rows('SELECT * FROM stage_events WHERE deal_id = :deal_id ORDER BY entered_at ASC', {'deal_id': deal_id})
 
 @app.get('/api/deals/{deal_id}/bbc')
 def bbc(deal_id: str, limit: int = 10):
