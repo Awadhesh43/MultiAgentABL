@@ -1,6 +1,8 @@
 from pathlib import Path
 import os
 import shutil
+import hashlib
+import json
 import sqlite3
 
 from fastapi import FastAPI, HTTPException
@@ -72,6 +74,42 @@ def pending_changes(status: str | None = None, deal_id: str | None = None):
 @app.get('/api/pending-changes/roles')
 def roles():
     return ['Credit Officer', 'Portfolio Manager', 'Operations Analyst', 'Relationship Manager']
+
+@app.get('/api/document-types')
+def document_types():
+    types = rows('document_types', order='ORDER BY name')
+    terms = rows('key_terms', order='ORDER BY created_at ASC')
+    by_type = {}
+    for term in terms:
+        aliases = term.get('aliases', [])
+        if isinstance(aliases, str):
+            try: aliases = json.loads(aliases)
+            except json.JSONDecodeError: aliases = []
+        term['aliases'] = aliases
+        by_type.setdefault(term['document_type_id'], []).append(term)
+    for item in types:
+        item['key_terms'] = by_type.get(item['id'], [])
+    return types
+
+@app.get('/api/audit/verify')
+def verify_audit_chain():
+    entries = rows('audit_log', order='ORDER BY id ASC')
+    previous = '0' * 64
+    for entry in entries:
+        detail = entry.get('detail', {})
+        if isinstance(detail, str):
+            try: detail = json.loads(detail)
+            except json.JSONDecodeError: detail = {}
+        hashable = {
+            'id': entry['id'], 'ts': entry['ts'], 'event_type': entry['event_type'],
+            'deal_id': entry['deal_id'], 'stage': entry['stage'], 'actor': entry['actor'],
+            'summary': entry['summary'], 'detail': detail, 'prev_hash': entry['prev_hash'],
+        }
+        digest = hashlib.sha256(json.dumps(hashable, sort_keys=True, default=str).encode()).hexdigest()
+        if entry['prev_hash'] != previous or entry['hash'] != digest:
+            return {'valid': False, 'broken_at_id': entry['id'], 'entry_count': len(entries)}
+        previous = entry['hash']
+    return {'valid': True, 'broken_at_id': None, 'entry_count': len(entries)}
 
 @app.get('/api/documents')
 def documents(deal_id: str | None = None):
