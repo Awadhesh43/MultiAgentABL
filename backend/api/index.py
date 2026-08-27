@@ -149,4 +149,3 @@ def audit(deal_id: str | None = None):
     return rows('audit_log', 'WHERE deal_id = ?', (deal_id,), 'ORDER BY id DESC') if deal_id else rows('audit_log', order='ORDER BY id DESC')
 
 __all__ = ['app']
->>>>>>> origin/application-deployment
