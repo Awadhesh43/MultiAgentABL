@@ -7,15 +7,8 @@ import {
   StageRunResponse, WikiChatResponse,
 } from './models';
 
-<<<<<<< HEAD
-const PRODUCTION_API = 'https://backend-916azfzws-awadhesh0043-9108s-projects.vercel.app/api';
-const BASE = typeof window !== 'undefined' && window.location.hostname.endsWith('vercel.app')
-  ? PRODUCTION_API
-  : '/api';
-=======
 const PRODUCTION_API = 'https://backend-fo8u3l2p9-awadhesh0043-9108s-projects.vercel.app/api';
 const BASE = typeof window !== 'undefined' && window.location.hostname.endsWith('vercel.app') ? PRODUCTION_API : '/api';
->>>>>>> 742be42 (feat: add new FastAPI backend and Vercel configuration for Agentic ABL Platform)
 
 @Service()
 export class Api {
