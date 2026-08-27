@@ -30,7 +30,7 @@
 
         <ng-container matColumnDef="created">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Created</th>
-          <td mat-cell *matCellDef="let d" class="mono-num">{{ d.created_at | date: 'MMM d, y' }}</td>
+          <td mat-cell *matCellDef="let d" class="mono-num">{{ d.created_at | date: 'MMM d, y, HH:mm:ss' }}</td>
         </ng-container>
 
         <ng-container matColumnDef="stage">
