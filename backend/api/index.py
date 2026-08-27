@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import re
 import shutil
 import hashlib
 import json
@@ -7,7 +8,7 @@ import sqlite3
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -45,6 +46,46 @@ def dashboard():
 @app.get('/api/deals')
 def list_deals():
     return rows('deals', order='ORDER BY borrower_name')
+
+@app.post('/api/deals')
+async def create_deal(request: Request):
+    body = await request.json()
+    borrower_name = str(body.get('borrower_name', '')).strip()
+    deal_name = str(body.get('deal_name', '')).strip()
+    industry = str(body.get('industry', '')).strip() or 'Not yet specified'
+    commitment = float(body.get('commitment', 0) or 0)
+    if not borrower_name or not deal_name or commitment <= 0:
+        raise HTTPException(400, 'Borrower name, deal name, and a positive commitment are required')
+    deal_id = f"{re.sub(r'[^a-z0-9]+', '-', borrower_name.lower()).strip('-')[:30] or 'deal'}-{uuid.uuid4().hex[:6]}"
+    timestamp = datetime.now(timezone.utc).isoformat()
+    columns = rows('deals', 'LIMIT 1')
+    if not columns:
+        raise HTTPException(500, 'Deals table is unavailable')
+    with sqlite3.connect(DB) as conn:
+        conn.execute(
+            f'''INSERT INTO deals (
+                id, borrower_name, deal_name, industry, naics, hq, sponsor,
+                facility_type, commitment, closing_date, maturity_date,
+                ar_advance_rate, inventory_advance_rate_nolv, inventory_cost_cap_pct,
+                dilution_threshold_pct, excess_availability_trigger_pct,
+                excess_availability_trigger_floor, fccr_minimum, stage, risk_rating,
+                watchlist, covenant_status, outstanding_balance, letters_of_credit,
+                latest_borrowing_base, latest_availability, trailing_revenue,
+                trailing_ebitda, unfinanced_capex, cash_taxes_paid, distributions,
+                scheduled_debt_service, annual_rent_and_leases, authority_level, created_at, updated_at
+            ) VALUES ({', '.join('?' for _ in range(36))})''', 
+            (deal_id, borrower_name, deal_name, industry, str(body.get('naics', '')), str(body.get('hq', '')),
+             str(body.get('sponsor', '')), str(body.get('facility_type', 'Senior secured ABL revolver')),
+             commitment, str(body.get('closing_date', '')), str(body.get('maturity_date', '')),
+             0.85, 0.85, 0.60, 0.05, 0.10, 2000000, 1.10, 'origination', 'Pass', 0,
+             'not_yet_tested', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'Credit Officer', timestamp, timestamp),
+        )
+        conn.execute(
+            'INSERT INTO stage_events (id, deal_id, stage, status, notes, entered_at) VALUES (?, ?, ?, ?, ?, ?)',
+            (uuid.uuid4().hex[:12], deal_id, 'origination', 'in_progress', '', timestamp),
+        )
+        conn.commit()
+    return ensure_deal(deal_id)
 
 @app.get('/api/deals/{deal_id}')
 def get_deal(deal_id: str):
