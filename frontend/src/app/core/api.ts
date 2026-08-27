@@ -7,7 +7,7 @@ import {
   StageRunResponse, WikiChatResponse,
 } from './models';
 
-const PRODUCTION_API = 'https://backend-fo8u3l2p9-awadhesh0043-9108s-projects.vercel.app/api';
+const PRODUCTION_API = 'https://backend-1juiyssps-awadhesh0043-9108s-projects.vercel.app/api';
 const BASE = typeof window !== 'undefined' && window.location.hostname.endsWith('vercel.app') ? PRODUCTION_API : '/api';
 
 @Service()
