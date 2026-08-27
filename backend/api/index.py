@@ -41,6 +41,29 @@ NEON_ENGINE = create_engine(
 )
 
 
+def ensure_neon_schema():
+    with NEON_ENGINE.begin() as conn:
+        conn.execute(text('''CREATE TABLE IF NOT EXISTS deals (
+            id TEXT PRIMARY KEY, borrower_name TEXT NOT NULL, deal_name TEXT NOT NULL,
+            industry TEXT NOT NULL DEFAULT 'Not yet specified', naics TEXT NOT NULL DEFAULT '', hq TEXT NOT NULL DEFAULT '', sponsor TEXT NOT NULL DEFAULT '',
+            facility_type TEXT NOT NULL DEFAULT 'Senior secured ABL revolver', commitment DOUBLE PRECISION NOT NULL,
+            closing_date TEXT NOT NULL DEFAULT '', maturity_date TEXT NOT NULL DEFAULT '', ar_advance_rate DOUBLE PRECISION NOT NULL DEFAULT 0.85,
+            inventory_advance_rate_nolv DOUBLE PRECISION NOT NULL DEFAULT 0.85, inventory_cost_cap_pct DOUBLE PRECISION NOT NULL DEFAULT 0.60,
+            dilution_threshold_pct DOUBLE PRECISION NOT NULL DEFAULT 0.05, excess_availability_trigger_pct DOUBLE PRECISION NOT NULL DEFAULT 0.10,
+            excess_availability_trigger_floor DOUBLE PRECISION NOT NULL DEFAULT 2000000, fccr_minimum DOUBLE PRECISION NOT NULL DEFAULT 1.10,
+            stage TEXT NOT NULL DEFAULT 'origination', risk_rating TEXT NOT NULL DEFAULT 'Pass', watchlist INTEGER NOT NULL DEFAULT 0,
+            covenant_status TEXT NOT NULL DEFAULT 'not_yet_tested', outstanding_balance DOUBLE PRECISION NOT NULL DEFAULT 0, letters_of_credit DOUBLE PRECISION NOT NULL DEFAULT 0,
+            latest_borrowing_base DOUBLE PRECISION NOT NULL DEFAULT 0, latest_availability DOUBLE PRECISION NOT NULL DEFAULT 0, trailing_revenue DOUBLE PRECISION NOT NULL DEFAULT 0,
+            trailing_ebitda DOUBLE PRECISION NOT NULL DEFAULT 0, unfinanced_capex DOUBLE PRECISION NOT NULL DEFAULT 0, cash_taxes_paid DOUBLE PRECISION NOT NULL DEFAULT 0,
+            distributions DOUBLE PRECISION NOT NULL DEFAULT 0, scheduled_debt_service DOUBLE PRECISION NOT NULL DEFAULT 0, annual_rent_and_leases DOUBLE PRECISION NOT NULL DEFAULT 0,
+            authority_level TEXT NOT NULL DEFAULT 'Credit Officer', created_at TEXT NOT NULL, updated_at TEXT NOT NULL)'''))
+        conn.execute(text('''CREATE TABLE IF NOT EXISTS stage_events (
+            id TEXT PRIMARY KEY, deal_id TEXT NOT NULL, stage TEXT NOT NULL, status TEXT NOT NULL, notes TEXT NOT NULL DEFAULT '', entered_at TEXT NOT NULL)'''))
+
+
+ensure_neon_schema()
+
+
 def neon_rows(sql: str, params: dict | None = None):
     with NEON_ENGINE.connect() as conn:
         return [dict(row) for row in conn.execute(text(sql), params or {}).mappings().all()]
