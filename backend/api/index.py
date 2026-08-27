@@ -2,10 +2,10 @@ from pathlib import Path
 import os
 import re
 import shutil
-import hashlib
-import json
 import sqlite3
 import uuid
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -28,6 +28,11 @@ if DATABASE_URL.startswith('postgres://'):
     DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql+pg8000://', 1)
 elif DATABASE_URL.startswith('postgresql://') and '+pg8000' not in DATABASE_URL:
     DATABASE_URL = DATABASE_URL.replace('postgresql://', 'postgresql+pg8000://', 1)
+_parts = urlsplit(DATABASE_URL)
+_query = [(key, value) for key, value in parse_qsl(_parts.query, keep_blank_values=True) if key.lower() not in {'sslmode', 'channel_binding'}]
+if not any(key == 'ssl_context' for key, _ in _query):
+    _query.append(('ssl_context', 'true'))
+DATABASE_URL = urlunsplit((_parts.scheme, _parts.netloc, _parts.path, urlencode(_query), _parts.fragment))
 NEON_ENGINE = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 
