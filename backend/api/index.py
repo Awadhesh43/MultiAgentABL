@@ -91,7 +91,7 @@ def health():
 @app.get('/api/dashboard')
 def dashboard():
     deals = neon_rows('SELECT * FROM deals ORDER BY borrower_name')
-    documents = rows('documents', order='ORDER BY uploaded_at DESC')
+    documents = neon_rows('SELECT * FROM documents ORDER BY uploaded_at DESC')
     return {'deals': deals, 'documents': documents, 'deal_count': len(deals), 'document_count': len(documents)}
 
 @app.get('/api/deals')
