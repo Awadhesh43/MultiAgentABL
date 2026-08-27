@@ -7,14 +7,8 @@ import {
   StageEvent, StageRunResponse, WikiChatResponse,
 } from './models';
 
-<<<<<<< HEAD
-const BASE = typeof window !== 'undefined' && window.location.hostname.endsWith('vercel.app')
-  ? 'https://abl-backend-api.vercel.app/api'
-  : '/api';
-=======
 const PRODUCTION_API = 'https://abl-backend-api.vercel.app/api';
 const BASE = typeof window !== 'undefined' && window.location.hostname.endsWith('vercel.app') ? PRODUCTION_API : '/api';
->>>>>>> origin/application-deployment
 
 @Service()
 export class Api {
