@@ -1,0 +1,24 @@
+<div class="timeline">
+  @for (step of steps(); track step.id; let last = $last) {
+    <div class="step" [class]="'state-' + step.state" [matTooltip]="step.notes || step.label">
+      <div class="dot">
+        @if (step.state === 'completed') {
+          <mat-icon>check</mat-icon>
+        } @else if (step.state === 'in_progress') {
+          <span class="pulse"></span>
+        }
+      </div>
+      <span class="label">{{ step.label }}</span>
+    </div>
+    @if (!last) {
+      <div class="connector" [class.filled]="step.state === 'completed'"></div>
+    }
+  }
+</div>
+
+@if (workoutStep(); as w) {
+  <div class="workout-branch">
+    <mat-icon>call_split</mat-icon>
+    <span>Branched to: <strong>{{ w.label }}</strong></span>
+  </div>
+}

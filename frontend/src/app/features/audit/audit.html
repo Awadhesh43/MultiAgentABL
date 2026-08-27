@@ -1,0 +1,51 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <h1>Audit Trail</h1>
+      <p class="subtitle">Every agent recommendation, human decision, document upload, and key-term change -- append-only and hash-chained end to end.</p>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <div class="loading"><mat-spinner diameter="32"></mat-spinner></div>
+  } @else {
+    @if (chain(); as c) {
+      <div class="chain-banner" [class.valid]="c.valid" [class.invalid]="!c.valid">
+        <mat-icon>{{ c.valid ? 'verified' : 'gpp_bad' }}</mat-icon>
+        <span>
+          @if (c.valid) {
+            Hash chain verified intact across all {{ c.entry_count }} entries. Nothing has been edited or removed.
+          } @else {
+            Hash chain integrity check FAILED at entry #{{ c.broken_at_id }}. The log may have been tampered with.
+          }
+        </span>
+      </div>
+    }
+
+    <mat-form-field appearance="outline" class="search-field">
+      <mat-label>Search entries</mat-label>
+      <input matInput [ngModel]="search()" (ngModelChange)="search.set($event)" placeholder="deal, actor, event type, summary..." />
+      <mat-icon matPrefix>search</mat-icon>
+    </mat-form-field>
+
+    <div class="audit-table">
+      <div class="audit-head">
+        <span>Time</span><span>Event</span><span>Deal</span><span>Actor</span><span>Summary</span><span>Hash</span>
+      </div>
+      @for (e of filtered(); track e.id) {
+        <div class="audit-entry">
+          <span class="mono ts">{{ e.ts | date: 'MMM d, y HH:mm:ss' }}</span>
+          <span class="evt" [class]="eventClass(e.event_type)">{{ e.event_type }}</span>
+          <span>
+            @if (e.deal_id) { <a [routerLink]="['/deals', e.deal_id]">{{ dealName(e.deal_id) }}</a> }
+          </span>
+          <span>{{ e.actor }}</span>
+          <span class="summary">{{ e.summary }}</span>
+          <span class="mono hash" [matTooltip]="e.hash">{{ e.hash.slice(0, 10) }}&hellip;</span>
+        </div>
+      } @empty {
+        <p class="empty">No audit entries match this search.</p>
+      }
+    </div>
+  }
+</div>
