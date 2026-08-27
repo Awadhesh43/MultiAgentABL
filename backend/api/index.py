@@ -4,8 +4,10 @@ import shutil
 import hashlib
 import json
 import sqlite3
+import uuid
+from datetime import datetime, timezone
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -110,6 +112,33 @@ def verify_audit_chain():
             return {'valid': False, 'broken_at_id': entry['id'], 'entry_count': len(entries)}
         previous = entry['hash']
     return {'valid': True, 'broken_at_id': None, 'entry_count': len(entries)}
+
+@app.post('/api/documents/upload')
+async def upload_document(
+    file: UploadFile = File(...),
+    document_type_id: str = Form(...),
+    deal_id: str | None = Form(None),
+    uploaded_by: str = Form('demo_user'),
+):
+    if not rows('document_types', 'WHERE id = ?', (document_type_id,)):
+        raise HTTPException(404, 'Document type not found')
+    if deal_id:
+        ensure_deal(deal_id)
+    content = await file.read()
+    filename = file.filename or 'uploaded-document'
+    document_id = str(uuid.uuid4())
+    timestamp = datetime.now(timezone.utc).isoformat()
+    safe_name = f'{document_id}_{Path(filename).name}'
+    destination = RUNTIME / safe_name
+    destination.write_bytes(content)
+    excerpt = content.decode('utf-8', errors='ignore')[:3000]
+    with sqlite3.connect(DB) as conn:
+        conn.execute(
+            'INSERT INTO documents (id, deal_id, document_type_id, filename, file_path, status, raw_text_excerpt, uploaded_at, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            (document_id, deal_id, document_type_id, filename, str(destination), 'pending_review', excerpt, timestamp, uploaded_by),
+        )
+        conn.commit()
+    return rows('documents', 'WHERE id = ?', (document_id,))[0]
 
 @app.get('/api/documents')
 def documents(deal_id: str | None = None):
