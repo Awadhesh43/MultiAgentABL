@@ -21,7 +21,14 @@ if SOURCE_DB.exists() and (not DB.exists() or DB.stat().st_size == 0):
     shutil.copyfile(SOURCE_DB, DB)
 
 app = FastAPI(title='Agentic ABL Platform API', version='0.1.0')
-NEON_ENGINE = create_engine(os.environ['DATABASE_URL'], pool_pre_ping=True)
+DATABASE_URL = os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL')
+if not DATABASE_URL:
+    raise RuntimeError('DATABASE_URL or POSTGRES_URL must be configured')
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql+psycopg2://', 1)
+elif DATABASE_URL.startswith('postgresql://') and '+psycopg2' not in DATABASE_URL:
+    DATABASE_URL = DATABASE_URL.replace('postgresql://', 'postgresql+psycopg2://', 1)
+NEON_ENGINE = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 
 def neon_rows(sql: str, params: dict | None = None):
