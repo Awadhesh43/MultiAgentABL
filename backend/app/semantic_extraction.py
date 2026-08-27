@@ -22,8 +22,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-import chromadb
-
 from . import config, extraction
 from .extraction import ExtractionCandidate
 
@@ -75,6 +73,8 @@ SEMANTIC_EXTRACTION_TOOL = {
 
 
 def _get_collection():
+    import chromadb
+
     client = chromadb.PersistentClient(path=str(config.CHROMA_DIR))
     return client.get_or_create_collection(COLLECTION_NAME)
 
