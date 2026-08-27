@@ -1,8 +1,11 @@
 from pathlib import Path
 import os
 import re
+import hashlib
+import json
 import shutil
 import sqlite3
+import ssl
 import uuid
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -31,7 +34,11 @@ elif DATABASE_URL.startswith('postgresql://') and '+pg8000' not in DATABASE_URL:
 _parts = urlsplit(DATABASE_URL)
 _query = [(key, value) for key, value in parse_qsl(_parts.query, keep_blank_values=True) if key.lower() not in {'sslmode', 'channel_binding', 'ssl_context'}]
 DATABASE_URL = urlunsplit((_parts.scheme, _parts.netloc, _parts.path, urlencode(_query), _parts.fragment))
-NEON_ENGINE = create_engine(DATABASE_URL, pool_pre_ping=True, connect_args={'ssl_context': True})
+NEON_ENGINE = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    connect_args={'ssl_context': ssl.create_default_context()},
+)
 
 
 def neon_rows(sql: str, params: dict | None = None):
