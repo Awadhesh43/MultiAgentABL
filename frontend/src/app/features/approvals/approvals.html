@@ -1,0 +1,69 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <h1>Approvals</h1>
+      <p class="subtitle">Every proposed change across the portfolio, in one queue. Nothing here has touched a deal record until a human decides it.</p>
+    </div>
+  </header>
+
+  <div class="filters">
+    <mat-button-toggle-group [value]="statusFilter()" (change)="statusFilter.set($event.value)">
+      <mat-button-toggle value="pending">Pending</mat-button-toggle>
+      <mat-button-toggle value="approved">Approved</mat-button-toggle>
+      <mat-button-toggle value="rejected">Rejected</mat-button-toggle>
+      <mat-button-toggle value="all">All</mat-button-toggle>
+    </mat-button-toggle-group>
+
+    <mat-button-toggle-group [value]="guardrailFilter()" (change)="guardrailFilter.set($event.value)">
+      <mat-button-toggle value="all">Any guardrail</mat-button-toggle>
+      <mat-button-toggle value="pass">Pass</mat-button-toggle>
+      <mat-button-toggle value="warn">Warn</mat-button-toggle>
+      <mat-button-toggle value="requires_elevated_approval">Elevated</mat-button-toggle>
+      <mat-button-toggle value="blocked">Blocked</mat-button-toggle>
+    </mat-button-toggle-group>
+  </div>
+
+  @if (loading()) {
+    <div class="loading"><mat-spinner diameter="32"></mat-spinner></div>
+  } @else {
+    <div class="change-list">
+      @for (c of filtered(); track c.id) {
+        <mat-card class="change-card">
+          <div class="change-top">
+            <div class="change-title">
+              <a [routerLink]="['/deals', c.deal_id]" class="deal-link">{{ dealName(c.deal_id) }}</a>
+              <span class="stage-label">{{ c.stage }}</span>
+            </div>
+            @if (c.status === 'pending') {
+              <app-guardrail-badge [status]="c.guardrail_status" />
+            } @else {
+              <app-status-badge [status]="c.status" />
+            }
+          </div>
+
+          <div class="change-body">
+            <span class="mono field">{{ c.field_path }}</span>
+            <span class="mono arrow">{{ c.old_value || '(none)' }} &rarr; {{ c.new_value }}</span>
+          </div>
+          <p class="rationale">{{ c.rationale }}</p>
+          <div class="change-meta">
+            <span>Proposed by <strong>{{ c.proposed_by }}</strong> &middot; {{ c.created_at | date: 'medium' }}</span>
+            @if (c.status !== 'pending') {
+              <span>{{ c.decided_by }} ({{ c.decided_role }}) &middot; {{ c.decided_at | date: 'medium' }}{{ c.override_used ? ' -- override' : '' }}</span>
+            }
+          </div>
+
+          @if (c.status === 'pending') {
+            <div class="change-actions">
+              <button mat-flat-button color="primary" (click)="decide(c)">Review</button>
+            </div>
+          } @else if (c.decision_notes) {
+            <p class="decision-notes">"{{ c.decision_notes }}"</p>
+          }
+        </mat-card>
+      } @empty {
+        <p class="empty">Nothing here for this filter.</p>
+      }
+    </div>
+  }
+</div>

@@ -1,0 +1,66 @@
+<h2 mat-dialog-title>Review proposed change</h2>
+
+<mat-dialog-content class="content">
+  <div class="change-summary">
+    <div class="row"><span class="k">Field</span><span class="v mono">{{ data.change.field_path }}</span></div>
+    <div class="row"><span class="k">Change</span><span class="v mono">{{ data.change.old_value || '(none)' }} &rarr; {{ data.change.new_value }}</span></div>
+    <div class="row"><span class="k">Proposed by</span><span class="v">{{ data.change.proposed_by }}</span></div>
+    <div class="row"><span class="k">Guardrail</span><span class="v"><app-guardrail-badge [status]="data.change.guardrail_status" /></span></div>
+    <p class="rationale">{{ data.change.rationale }}</p>
+    @if (data.change.guardrail_notes) {
+      <p class="guardrail-notes">{{ data.change.guardrail_notes }}</p>
+    }
+  </div>
+
+  <mat-button-toggle-group class="approve-toggle" [value]="approve()" (change)="approve.set($event.value)">
+    <mat-button-toggle [value]="true">Approve</mat-button-toggle>
+    <mat-button-toggle [value]="false">Reject</mat-button-toggle>
+  </mat-button-toggle-group>
+
+  @if (approve() && isBlocked) {
+    <div class="guardrail-warning">
+      <mat-icon>block</mat-icon>
+      <div>
+        This change is <strong>blocked</strong> by a guardrail. Approving it requires an explicit
+        override at <strong>{{ requiredAuthority }}</strong> authority or above, with a written justification.
+      </div>
+    </div>
+    <mat-checkbox [checked]="override()" (change)="override.set($event.checked)">
+      I am overriding this guardrail and accept responsibility for this decision.
+    </mat-checkbox>
+  }
+
+  @if (approve() && isElevated) {
+    <div class="guardrail-info">
+      <mat-icon>gavel</mat-icon>
+      <div>Requires <strong>{{ requiredAuthority }}</strong> authority or above to approve.</div>
+    </div>
+  }
+
+  <div class="fields">
+    <mat-form-field appearance="outline">
+      <mat-label>Decided by</mat-label>
+      <input matInput [ngModel]="decidedBy()" (ngModelChange)="decidedBy.set($event)" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Acting role</mat-label>
+      <mat-select [ngModel]="role()" (ngModelChange)="role.set($event)">
+        @for (r of data.roles; track r) {
+          <mat-option [value]="r">{{ r }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  <mat-form-field appearance="outline" class="notes-field">
+    <mat-label>{{ isBlocked && approve() ? 'Override justification (required)' : 'Notes (optional)' }}</mat-label>
+    <textarea matInput rows="3" [ngModel]="notes()" (ngModelChange)="notes.set($event)"></textarea>
+  </mat-form-field>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="cancel()">Cancel</button>
+  <button mat-flat-button [color]="approve() ? 'primary' : 'warn'" [disabled]="!canSubmit" (click)="submit()">
+    {{ approve() ? 'Confirm approval' : 'Confirm rejection' }}
+  </button>
+</mat-dialog-actions>

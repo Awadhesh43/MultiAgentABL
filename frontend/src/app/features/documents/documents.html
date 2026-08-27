@@ -1,0 +1,210 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <h1>Document Intake</h1>
+      <p class="subtitle">
+        Every document type has its own list of key terms the parser looks for. Add a term here and the
+        very next upload of that type will look for it -- no code change, no redeploy.
+      </p>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <div class="loading"><mat-spinner diameter="32"></mat-spinner></div>
+  } @else {
+    <div class="layout">
+      <div class="left-col">
+        <mat-card>
+          <mat-card-header><mat-card-title>Document types &amp; key terms</mat-card-title></mat-card-header>
+          <mat-card-content>
+            <mat-accordion multi>
+              @for (t of documentTypes(); track t.id) {
+                <mat-expansion-panel>
+                  <mat-expansion-panel-header>
+                    <mat-panel-title>{{ t.name }}</mat-panel-title>
+                    <mat-panel-description>{{ t.key_terms.length }} terms</mat-panel-description>
+                  </mat-expansion-panel-header>
+
+                  <p class="type-desc">{{ t.description }}</p>
+                  <div class="term-list">
+                    @for (term of t.key_terms; track term.id) {
+                      <div class="term-row">
+                        <span class="term-label">{{ term.label }}</span>
+                        <span class="term-type mono">{{ term.data_type }}</span>
+                        @if (term.aliases.length) {
+                          <span class="term-aliases">aka {{ term.aliases.join(', ') }}</span>
+                        }
+                        <button mat-icon-button (click)="isEditingTerm(term.id) ? cancelEditTerm() : startEditTerm(term.id)" matTooltip="Edit this term's aliases">
+                          <mat-icon>{{ isEditingTerm(term.id) ? 'close' : 'edit' }}</mat-icon>
+                        </button>
+                        @if (!term.is_default) {
+                          <button mat-icon-button (click)="removeKeyTerm(t.id, term.id)" matTooltip="Remove this user-added term">
+                            <mat-icon>delete_outline</mat-icon>
+                          </button>
+                        } @else {
+                          <span class="default-tag">default</span>
+                        }
+                      </div>
+
+                      @if (isEditingTerm(term.id)) {
+                        <div class="term-edit-form">
+                          <mat-form-field appearance="outline" class="grow">
+                            <mat-label>Label (locked)</mat-label>
+                            <input matInput [value]="term.label" disabled />
+                          </mat-form-field>
+                          <div class="existing-aliases">
+                            <span class="k">Existing aliases</span>
+                            <span class="v">{{ term.aliases.length ? term.aliases.join(', ') : '(none yet)' }}</span>
+                          </div>
+                          <mat-form-field appearance="outline" class="grow">
+                            <mat-label>Add aliases (comma-separated)</mat-label>
+                            <input matInput [ngModel]="editAliasesValue(term.id)" (ngModelChange)="setEditAliasesValue(term.id, $event)" placeholder="e.g. Total Borrowing Base" />
+                          </mat-form-field>
+                          <div class="term-edit-actions">
+                            <button mat-flat-button color="primary" (click)="saveTermAliases(t.id, term.id)">
+                              <mat-icon>add</mat-icon> Add to existing aliases
+                            </button>
+                            <button mat-button (click)="cancelEditTerm()">Cancel</button>
+                          </div>
+                          <p class="term-edit-hint">New aliases are appended to the list above -- they never replace or remove an existing alias, and the label can't be changed here.</p>
+                        </div>
+                      }
+                    }
+                  </div>
+
+                  <div class="add-term-form">
+                    <mat-form-field appearance="outline" class="grow">
+                      <mat-label>New key term label</mat-label>
+                      <input matInput [ngModel]="termLabel(t.id)" (ngModelChange)="setTermLabel(t.id, $event)" placeholder="e.g. Landlord Waiver Status" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="grow">
+                      <mat-label>Aliases (comma-separated)</mat-label>
+                      <input matInput [ngModel]="termAliases(t.id)" (ngModelChange)="setTermAliases(t.id, $event)" placeholder="e.g. Landlord Consent, LW Status" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Type</mat-label>
+                      <mat-select [ngModel]="termDataType(t.id)" (ngModelChange)="setTermDataType(t.id, $event)">
+                        <mat-option value="text">Text</mat-option>
+                        <mat-option value="number">Number</mat-option>
+                        <mat-option value="currency">Currency</mat-option>
+                        <mat-option value="percent">Percent</mat-option>
+                        <mat-option value="date">Date</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                    <button mat-stroked-button color="primary" (click)="addKeyTerm(t.id)">
+                      <mat-icon>add</mat-icon> Add term
+                    </button>
+                  </div>
+                </mat-expansion-panel>
+              }
+            </mat-accordion>
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card class="upload-card">
+          <mat-card-header><mat-card-title>Upload a document</mat-card-title></mat-card-header>
+          <mat-card-content>
+            <div class="upload-form">
+              <mat-form-field appearance="outline">
+                <mat-label>Document type</mat-label>
+                <mat-select [ngModel]="uploadTypeId()" (ngModelChange)="uploadTypeId.set($event)">
+                  @for (t of documentTypes(); track t.id) {
+                    <mat-option [value]="t.id">{{ t.name }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Deal (optional)</mat-label>
+                <mat-select [ngModel]="uploadDealId()" (ngModelChange)="uploadDealId.set($event)">
+                  <mat-option value="">Unassigned</mat-option>
+                  @for (d of deals(); track d.id) {
+                    <mat-option [value]="d.id">{{ d.borrower_name }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <input type="file" accept=".txt,.pdf,.docx" (change)="onFileSelected($event)" class="file-input" />
+              <button mat-flat-button color="primary" [disabled]="!uploadFile() || uploading()" (click)="upload()">
+                @if (uploading()) {
+                  <mat-spinner diameter="18"></mat-spinner>
+                } @else {
+                  <ng-container><mat-icon>upload</mat-icon> Upload &amp; extract</ng-container>
+                }
+              </button>
+              <p class="upload-hint">Accepts .txt, .pdf, .docx. The parser looks for the key terms configured above for the selected document type.</p>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+
+      <div class="right-col">
+        @if (selectedDocument(); as doc) {
+          <mat-card class="review-card">
+            <mat-card-header>
+              <mat-card-title>{{ doc.filename }}</mat-card-title>
+              <mat-card-subtitle>{{ typeName(doc.document_type_id) }} &middot; {{ dealName(doc.deal_id) }} &middot; <app-status-badge [status]="doc.status === 'pending_review' ? 'pending' : 'approved'" /></mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content>
+              <div class="field-review-list">
+                @for (f of doc.extracted_fields; track f.id) {
+                  <div class="field-review-row" [class.confirmed]="f.status === 'confirmed'" [class.rejected]="f.status === 'rejected'">
+                    <div class="frr-top">
+                      <span class="frr-label">{{ f.label }}</span>
+                      <span class="badge" [class]="confidenceClass(f.confidence)">{{ f.confidence | percent: '1.0-0' }} confidence</span>
+                      @if (f.status !== 'pending_review') {
+                        <app-status-badge [status]="f.status === 'confirmed' ? 'approved' : 'rejected'" />
+                      }
+                    </div>
+                    <mat-form-field appearance="outline" class="frr-input">
+                      <input matInput [ngModel]="fieldValue(f.id)" (ngModelChange)="setFieldValue(f.id, $event)" [disabled]="f.status !== 'pending_review'" />
+                    </mat-form-field>
+                    @if (f.status === 'pending_review') {
+                      <div class="frr-actions">
+                        <button mat-stroked-button color="primary" (click)="reviewField(f, true)">Confirm</button>
+                        <button mat-button (click)="reviewField(f, false)">Reject</button>
+                      </div>
+                    } @else if (doc.deal_id && f.status === 'confirmed') {
+                      <mat-form-field appearance="outline" class="frr-mapping">
+                        <mat-label>Apply to deal field</mat-label>
+                        <mat-select [ngModel]="mappingFor(f.id)" (ngModelChange)="setMapping(f.id, $event)">
+                          <mat-option value="">Don't apply</mat-option>
+                          @for (opt of dealFieldOptions; track opt.value) {
+                            <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
+                          }
+                        </mat-select>
+                      </mat-form-field>
+                    }
+                  </div>
+                }
+              </div>
+
+              @if (doc.deal_id) {
+                <button mat-flat-button color="primary" class="apply-btn" (click)="applyToDeal()">
+                  Stage mapped fields as proposed deal changes
+                </button>
+              } @else {
+                <p class="unassigned-hint">This document isn't linked to a deal, so extracted fields can be reviewed here but can't be applied anywhere.</p>
+              }
+            </mat-card-content>
+          </mat-card>
+        } @else {
+          <p class="pick-hint">Upload a document, or select one from the list below, to review its extracted fields.</p>
+        }
+
+        <h3>Recent documents</h3>
+        <div class="doc-list">
+          @for (doc of documents(); track doc.id) {
+            <div class="doc-list-row" [class.active]="selectedDocument()?.id === doc.id" (click)="openDocument(doc)">
+              <div>
+                <span class="doc-name">{{ doc.filename }}</span>
+                <span class="doc-sub">{{ typeName(doc.document_type_id) }} &middot; {{ dealName(doc.deal_id) }} &middot; {{ doc.uploaded_at | date: 'short' }}</span>
+              </div>
+              <app-status-badge [status]="doc.status === 'pending_review' ? 'pending' : 'approved'" />
+            </div>
+          } @empty {
+            <p class="empty">No documents uploaded yet.</p>
+          }
+        </div>
+      </div>
+    </div>
+  }
+</div>

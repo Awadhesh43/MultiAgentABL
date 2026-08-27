@@ -1,0 +1,42 @@
+<mat-toolbar class="app-toolbar">
+  <span class="brand">
+    <span class="brand-mark">ABL</span>
+    <span class="brand-name">Agentic ABL Platform</span>
+  </span>
+
+  <nav class="nav-links">
+    <a mat-button routerLink="/dashboard" routerLinkActive="active">Portfolio</a>
+    <a mat-button routerLink="/approvals" routerLinkActive="active" [matBadge]="pendingCount() || null" matBadgeColor="warn" matBadgeSize="small">Approvals</a>
+    <a mat-button routerLink="/documents" routerLinkActive="active">Document Intake</a>
+    <a mat-button routerLink="/audit" routerLinkActive="active">Audit Trail</a>
+    <a mat-button routerLink="/wiki" routerLinkActive="active">ABL Wiki</a>
+  </nav>
+
+  <span class="spacer"></span>
+
+  <button mat-button [matMenuTriggerFor]="sessionMenu" class="session-btn">
+    <mat-icon>account_circle</mat-icon>
+    <span class="session-label">{{ session.name() }} &middot; {{ session.role() }}</span>
+  </button>
+  <mat-menu #sessionMenu="matMenu">
+    <div class="session-menu-content" (click)="$event.stopPropagation()">
+      <mat-form-field appearance="outline" class="session-field">
+        <mat-label>Acting as</mat-label>
+        <input matInput [ngModel]="session.name()" (ngModelChange)="session.setName($event)" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="session-field">
+        <mat-label>Role</mat-label>
+        <mat-select [ngModel]="session.role()" (ngModelChange)="session.setRole($event)">
+          @for (r of roles(); track r) {
+            <mat-option [value]="r">{{ r }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <p class="session-hint">This role gates which approvals you can act on -- it's checked server-side, not just hidden in the UI.</p>
+    </div>
+  </mat-menu>
+</mat-toolbar>
+
+<main class="app-main">
+  <router-outlet></router-outlet>
+</main>

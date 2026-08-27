@@ -1,0 +1,260 @@
+@if (loading()) {
+  <div class="loading"><mat-spinner diameter="32"></mat-spinner></div>
+} @else if (deal(); as d) {
+  <div class="page">
+    <a routerLink="/dashboard" class="back-link"><mat-icon>arrow_back</mat-icon> Portfolio</a>
+
+    <header class="deal-header">
+      <div>
+        <h1>{{ d.borrower_name }}</h1>
+        <p class="subtitle">{{ d.industry }} &middot; {{ d.hq }} &middot; Sponsor: {{ d.sponsor }}</p>
+      </div>
+      <div class="header-chips">
+        <mat-chip-set>
+          <mat-chip matTooltip="Facility type (informational)">{{ d.facility_type }}</mat-chip>
+          <mat-chip
+            [class]="'rating-' + (d.risk_rating === 'Pass' ? 'pass' : d.risk_rating === 'Special Mention' ? 'watch' : 'classified')"
+            matTooltip="Current risk rating (informational)"
+          >
+            {{ d.risk_rating }}
+          </mat-chip>
+          @if (d.watchlist) { <mat-chip class="rating-watch" matTooltip="On the portfolio watchlist (informational)"><mat-icon inline>visibility</mat-icon> Watchlist</mat-chip> }
+        </mat-chip-set>
+      </div>
+    </header>
+
+    <app-lifecycle-timeline [stageEvents]="stageEvents()" />
+
+    <div class="advance-row">
+      @if (isOnStandardSequence && !isFinalStage) {
+        <button
+          mat-flat-button color="primary"
+          [disabled]="!canAdvance || advancing()"
+          [matTooltip]="canAdvance ? 'Move this deal to the next stage' : advanceBlockedReason"
+          (click)="advanceStage()"
+        >
+          @if (advancing()) {
+            <mat-spinner diameter="18"></mat-spinner>
+          } @else {
+            <ng-container><mat-icon>arrow_forward</mat-icon> Advance to &quot;{{ nextStageLabel }}&quot;</ng-container>
+          }
+        </button>
+        @if (!canAdvance) {
+          <span class="advance-hint">{{ advanceBlockedReason }}</span>
+        }
+      } @else {
+        <span class="advance-hint">{{ advanceBlockedReason }}</span>
+      }
+    </div>
+
+    <div class="metric-row">
+      <div class="metric"><span class="k">Commitment</span><span class="v">{{ d.commitment | currency: 'USD':'symbol':'1.0-0' }}</span></div>
+      <div class="metric"><span class="k">Outstanding</span><span class="v">{{ d.outstanding_balance | currency: 'USD':'symbol':'1.0-0' }}</span></div>
+      <div class="metric"><span class="k">Borrowing base</span><span class="v">{{ d.latest_borrowing_base | currency: 'USD':'symbol':'1.0-0' }}</span></div>
+      <div class="metric" [class.warn]="d.latest_availability < d.excess_availability_trigger_floor">
+        <span class="k">Availability</span><span class="v">{{ d.latest_availability | currency: 'USD':'symbol':'1.0-0' }}</span>
+      </div>
+      <div class="metric"><span class="k">Covenant status</span><span class="v">{{ d.covenant_status }}</span></div>
+    </div>
+
+    <mat-tab-group class="deal-tabs" animationDuration="150ms">
+      <mat-tab label="Overview">
+        <div class="tab-panel">
+          <div class="grid-2">
+            <mat-card>
+              <mat-card-header><mat-card-title>Facility terms</mat-card-title></mat-card-header>
+              <mat-card-content class="kv-list">
+                <div><span>AR advance rate</span><span>{{ d.ar_advance_rate | percent }}</span></div>
+                <div><span>Inventory advance rate (NOLV)</span><span>{{ d.inventory_advance_rate_nolv | percent }}</span></div>
+                <div><span>Inventory cost cap</span><span>{{ d.inventory_cost_cap_pct | percent }}</span></div>
+                <div><span>Dilution threshold</span><span>{{ d.dilution_threshold_pct | percent }}</span></div>
+                <div><span>Excess availability trigger</span><span>{{ d.excess_availability_trigger_pct | percent }} of BB, floor {{ d.excess_availability_trigger_floor | currency:'USD':'symbol':'1.0-0' }}</span></div>
+                <div><span>FCCR minimum</span><span>{{ d.fccr_minimum }}x</span></div>
+                <div><span>Closing / Maturity</span><span>{{ d.closing_date || 'TBD' }} &rarr; {{ d.maturity_date || 'TBD' }}</span></div>
+                <div><span>Authority level</span><span>{{ d.authority_level }}</span></div>
+              </mat-card-content>
+            </mat-card>
+            <mat-card>
+              <mat-card-header><mat-card-title>Trailing financials</mat-card-title></mat-card-header>
+              <mat-card-content class="kv-list">
+                <div><span>Revenue</span><span>{{ d.trailing_revenue | currency:'USD':'symbol':'1.0-0' }}</span></div>
+                <div><span>EBITDA</span><span>{{ d.trailing_ebitda | currency:'USD':'symbol':'1.0-0' }}</span></div>
+                <div><span>Unfinanced capex</span><span>{{ d.unfinanced_capex | currency:'USD':'symbol':'1.0-0' }}</span></div>
+                <div><span>Cash taxes paid</span><span>{{ d.cash_taxes_paid | currency:'USD':'symbol':'1.0-0' }}</span></div>
+                <div><span>Scheduled debt service</span><span>{{ d.scheduled_debt_service | currency:'USD':'symbol':'1.0-0' }}</span></div>
+                <div><span>Annual rent &amp; leases</span><span>{{ d.annual_rent_and_leases | currency:'USD':'symbol':'1.0-0' }}</span></div>
+              </mat-card-content>
+            </mat-card>
+          </div>
+
+          <mat-card class="agent-runner">
+            <mat-card-header>
+              <mat-card-title>Run a stage agent</mat-card-title>
+              <mat-card-subtitle>Produces a recommendation grounded in the ABL knowledge base. Any proposed change lands in the approvals queue below -- nothing here writes to the deal directly.</mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content>
+              <div class="runner-row">
+                <mat-form-field appearance="outline">
+                  <mat-label>Stage</mat-label>
+                  <mat-select [ngModel]="selectedStage()" (ngModelChange)="selectedStage.set($event)">
+                    @for (s of allStages; track s.id) {
+                      <mat-option [value]="s.id">{{ s.label }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="context-field">
+                  <mat-label>Additional context (optional)</mat-label>
+                  <input matInput [ngModel]="extraContext()" (ngModelChange)="extraContext.set($event)" placeholder="e.g. borrower disclosed a new customer concentration issue" />
+                </mat-form-field>
+                <button mat-flat-button color="primary" [disabled]="running()" (click)="runStage()">
+                  @if (running()) { <mat-spinner diameter="18"></mat-spinner> } @else { Run agent }
+                </button>
+              </div>
+
+              @if (lastRun(); as run) {
+                <div class="run-result">
+                  <div class="run-result-head">
+                    <strong>{{ run.agent_name }}</strong>
+                    <span class="badge" [class.badge-approved]="run.source === 'llm'" [class.badge-pending]="run.source === 'rule_based'">
+                      {{ run.source === 'llm' ? 'LLM-grounded' : 'Rule-based fallback' }}
+                    </span>
+                  </div>
+                  <p class="run-text">{{ run.text }}</p>
+                  @if (run.citations.length) {
+                    <p class="citations">Sources: {{ citationLabel(run) }}</p>
+                  }
+                  @if (run.pending_changes.length) {
+                    <div class="run-changes">
+                      <span class="k">Proposed changes staged for approval:</span>
+                      @for (c of run.pending_changes; track c.id) {
+                        <div class="run-change-row">
+                          <span class="mono">{{ c.field_path }} &rarr; {{ c.new_value }}</span>
+                          <app-guardrail-badge [status]="c.guardrail_status" />
+                        </div>
+                      }
+                    </div>
+                  } @else {
+                    <p class="no-changes">No changes proposed this run.</p>
+                  }
+                </div>
+              }
+            </mat-card-content>
+          </mat-card>
+        </div>
+      </mat-tab>
+
+      <mat-tab label="Borrowing base history">
+        <div class="tab-panel">
+          <div class="table-wrap">
+            <table mat-table [dataSource]="bbcHistory()" class="bbc-table">
+              <ng-container matColumnDef="period_end"><th mat-header-cell *matHeaderCellDef>Period end</th><td mat-cell *matCellDef="let b">{{ b.period_end }}</td></ng-container>
+              <ng-container matColumnDef="gross_ar"><th mat-header-cell *matHeaderCellDef>Gross AR</th><td mat-cell *matCellDef="let b" class="mono-num">{{ b.gross_ar | currency:'USD':'symbol':'1.0-0' }}</td></ng-container>
+              <ng-container matColumnDef="eligible_ar"><th mat-header-cell *matHeaderCellDef>Eligible AR</th><td mat-cell *matCellDef="let b" class="mono-num">{{ b.eligible_ar | currency:'USD':'symbol':'1.0-0' }}</td></ng-container>
+              <ng-container matColumnDef="borrowing_base"><th mat-header-cell *matHeaderCellDef>Borrowing base</th><td mat-cell *matCellDef="let b" class="mono-num">{{ b.borrowing_base | currency:'USD':'symbol':'1.0-0' }}</td></ng-container>
+              <ng-container matColumnDef="availability"><th mat-header-cell *matHeaderCellDef>Availability</th><td mat-cell *matCellDef="let b" class="mono-num" [class.negative]="b.availability < 0">{{ b.availability | currency:'USD':'symbol':'1.0-0' }}</td></ng-container>
+              <ng-container matColumnDef="dilution_pct"><th mat-header-cell *matHeaderCellDef>Dilution</th><td mat-cell *matCellDef="let b" class="mono-num">{{ b.dilution_pct | percent:'1.1-1' }}</td></ng-container>
+              <ng-container matColumnDef="flags">
+                <th mat-header-cell *matHeaderCellDef>Flags</th>
+                <td mat-cell *matCellDef="let b">
+                  @if (b.cash_dominion_active) { <span class="badge badge-elevated">Cash dominion</span> }
+                  @if (b.fccr_tested) { <span class="badge badge-warn">FCCR tested</span> }
+                </td>
+              </ng-container>
+              <tr mat-header-row *matHeaderRowDef="bbcColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: bbcColumns"></tr>
+            </table>
+            @if (!bbcHistory().length) { <p class="empty">No borrowing base certificates on file yet.</p> }
+          </div>
+        </div>
+      </mat-tab>
+
+      <mat-tab>
+        <ng-template mat-tab-label>Approvals @if (pendingOnly.length) { <span class="tab-badge">{{ pendingOnly.length }}</span> }</ng-template>
+        <div class="tab-panel">
+          <h3>Pending ({{ pendingOnly.length }})</h3>
+          @for (c of pendingOnly; track c.id) {
+            <mat-card class="change-card">
+              <div class="change-top">
+                <div>
+                  <span class="mono field">{{ c.field_path }}</span>
+                  <span class="mono arrow">{{ c.old_value || '(none)' }} &rarr; {{ c.new_value }}</span>
+                </div>
+                <app-guardrail-badge [status]="c.guardrail_status" />
+              </div>
+              <p class="rationale">{{ c.rationale }}</p>
+              <div class="change-meta">
+                <span>Proposed by <strong>{{ c.proposed_by }}</strong></span>
+                <span>{{ c.created_at | date: 'medium' }}</span>
+              </div>
+              <div class="change-actions">
+                <button mat-stroked-button (click)="decide(c)">Review</button>
+              </div>
+            </mat-card>
+          } @empty {
+            <p class="empty">No pending approvals for this deal.</p>
+          }
+
+          <h3>History</h3>
+          @for (c of decidedOnly; track c.id) {
+            <mat-card class="change-card decided">
+              <div class="change-top">
+                <div>
+                  <span class="mono field">{{ c.field_path }}</span>
+                  <span class="mono arrow">{{ c.old_value || '(none)' }} &rarr; {{ c.new_value }}</span>
+                </div>
+                <app-status-badge [status]="c.status" />
+              </div>
+              <p class="rationale">{{ c.rationale }}</p>
+              <div class="change-meta">
+                <span>{{ c.decided_by }} ({{ c.decided_role }}){{ c.override_used ? ' -- guardrail override' : '' }}</span>
+                <span>{{ c.decided_at | date: 'medium' }}</span>
+              </div>
+              @if (c.decision_notes) { <p class="decision-notes">"{{ c.decision_notes }}"</p> }
+            </mat-card>
+          } @empty {
+            <p class="empty">No decided items yet.</p>
+          }
+        </div>
+      </mat-tab>
+
+      <mat-tab label="Documents">
+        <div class="tab-panel">
+          @for (doc of documents(); track doc.id) {
+            <mat-card class="doc-card">
+              <div class="doc-top">
+                <span class="filename">{{ doc.filename }}</span>
+                <span class="badge" [class.badge-approved]="doc.status === 'processed'" [class.badge-pending]="doc.status === 'pending_review'">{{ doc.status }}</span>
+              </div>
+              <div class="doc-fields">
+                @for (f of doc.extracted_fields; track f.id) {
+                  <div class="doc-field-row">
+                    <span class="label">{{ f.label }}</span>
+                    <span class="value mono">{{ f.extracted_value || '(not found)' }}</span>
+                    <app-status-badge [status]="f.status === 'pending_review' ? 'pending' : (f.status === 'confirmed' ? 'approved' : 'rejected')" />
+                  </div>
+                }
+              </div>
+            </mat-card>
+          } @empty {
+            <p class="empty">No documents uploaded for this deal yet. Use the Document Intake page to upload one.</p>
+          }
+        </div>
+      </mat-tab>
+
+      <mat-tab label="Audit trail">
+        <div class="tab-panel">
+          @for (e of auditEntries(); track e.id) {
+            <div class="audit-row">
+              <span class="ts mono">{{ e.ts | date: 'medium' }}</span>
+              <span class="event-type">{{ e.event_type }}</span>
+              <span class="actor">{{ e.actor }}</span>
+              <span class="summary">{{ e.summary }}</span>
+            </div>
+          } @empty {
+            <p class="empty">No audit entries for this deal yet.</p>
+          }
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  </div>
+}

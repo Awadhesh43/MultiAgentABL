@@ -1,0 +1,47 @@
+<div class="page wiki-page">
+  <header class="page-header">
+    <div>
+      <h1>ABL Wiki</h1>
+      <p class="subtitle">Read-only, retrieval-grounded chat over the bank's curated ABL knowledge base. It never proposes or makes changes to any deal.</p>
+    </div>
+  </header>
+
+  <div class="chat-shell">
+    <div class="chat-log">
+      @for (m of messages(); track $index) {
+        <div class="msg" [class.from-user]="m.role === 'user'" [class.from-agent]="m.role === 'agent'">
+          <div class="bubble">
+            <p>{{ m.text }}</p>
+            @if (m.citations?.length) {
+              <p class="citations">Sources: {{ citationLabel(m) }}</p>
+            }
+          </div>
+        </div>
+      }
+      @if (asking()) {
+        <div class="msg from-agent">
+          <div class="bubble typing"><mat-spinner diameter="16"></mat-spinner> thinking&hellip;</div>
+        </div>
+      }
+      <div #scrollAnchor></div>
+    </div>
+
+    @if (messages().length <= 1) {
+      <div class="starters">
+        @for (s of starters; track s) {
+          <button mat-stroked-button (click)="ask(s)">{{ s }}</button>
+        }
+      </div>
+    }
+
+    <form class="composer" (ngSubmit)="ask()">
+      <mat-form-field appearance="outline" class="composer-field">
+        <mat-label>Ask about ABL terms, mechanics, or policy&hellip;</mat-label>
+        <input matInput [ngModel]="question()" (ngModelChange)="question.set($event)" name="question" />
+      </mat-form-field>
+      <button mat-flat-button color="primary" type="submit" [disabled]="asking() || !question().trim()">
+        <mat-icon>send</mat-icon>
+      </button>
+    </form>
+  </div>
+</div>
