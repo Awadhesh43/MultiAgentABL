@@ -33,6 +33,8 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 # uploaded-document chunks there too, under a separate collection name, so
 # both share one Chroma store without mixing their content.
 CHROMA_DIR = RUNTIME_DIR / "chroma_db"
+KNOWLEDGE_BASE_DIR = BACKEND_DIR / "data" / "knowledge_base"
+KB_COLLECTION_NAME = "abl_knowledge_base"
 
 SAMPLE_DOCS_DIR = BACKEND_DIR / "sample_documents"
 

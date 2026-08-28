@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, text
 
 from app import config, schemas
+from app import knowledge_base
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME = Path('/tmp/abl-platform') if os.environ.get('VERCEL') else ROOT
@@ -77,24 +78,11 @@ app.add_middleware(CORSMiddleware, allow_origins=['*'], allow_credentials=False,
 
 @app.post('/api/wiki/chat', response_model=schemas.WikiChatResponse)
 def wiki_chat(req: schemas.WikiChatRequest):
-    # Keep retrieval server-local and deterministic in Vercel; Chroma is optional.
-    query_terms = {term.lower() for term in re.findall(r'[a-zA-Z0-9]{3,}', req.question)}
-    excerpts = []
-    kb_dir = ROOT / 'data' / 'knowledge_base'
-    for path in sorted(kb_dir.glob('*.md')):
-        content = path.read_text(encoding='utf-8')
-        paragraphs = [p.strip() for p in re.split(r'\\n\\s*\\n', content) if p.strip()]
-        for paragraph in paragraphs:
-            score = sum(term in paragraph.lower() for term in query_terms)
-            if score:
-                title = paragraph.splitlines()[0].lstrip('# ').strip()[:120]
-                excerpts.append((score, path.name, title, paragraph[:1800]))
-    excerpts.sort(key=lambda item: item[0], reverse=True)
-    hits = excerpts[:4]
-    citations = [{'source': source, 'title': title} for _, source, title, _ in hits]
+    hits = knowledge_base.search(req.question, n_results=4)
+    citations = [{'source': hit.source, 'title': hit.title} for hit in hits]
     if not hits:
         return schemas.WikiChatResponse(answer="I couldn't find anything in the knowledge base related to that question.", citations=[], grounded=False)
-    context_block = '\\n\\n'.join(f'[{source} - {title}]\\n{text}' for _, source, title, text in hits)
+    context_block = '\\n\\n'.join(f'[{hit.source} - {hit.title}]\\n{hit.text}' for hit in hits)
     if config.ANTHROPIC_API_KEY:
         try:
             import anthropic
