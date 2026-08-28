@@ -96,14 +96,17 @@ def wiki_chat(req: schemas.WikiChatRequest):
         return schemas.WikiChatResponse(answer="I couldn't find anything in the knowledge base related to that question.", citations=[], grounded=False)
     context_block = '\\n\\n'.join(f'[{source} - {title}]\\n{text}' for _, source, title, text in hits)
     if config.ANTHROPIC_API_KEY:
-        import anthropic
-        response = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY).messages.create(
-            model=config.DEFAULT_MODEL, max_tokens=600,
-            system='You are the ABL Wiki agent. Answer strictly from the provided knowledge base excerpts.',
-            messages=[{'role': 'user', 'content': f'Knowledge base excerpts:\\n\\n{context_block}\\n\\nQuestion: {req.question}'}],
-        )
-        answer = ''.join(block.text for block in response.content if getattr(block, 'type', '') == 'text')
-        return schemas.WikiChatResponse(answer=answer, citations=citations, grounded=True)
+        try:
+            import anthropic
+            response = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY).messages.create(
+                model=config.DEFAULT_MODEL, max_tokens=600,
+                system='You are the ABL Wiki agent. Answer strictly from the provided knowledge base excerpts.',
+                messages=[{'role': 'user', 'content': f'Knowledge base excerpts:\\n\\n{context_block}\\n\\nQuestion: {req.question}'}],
+            )
+            answer = ''.join(block.text for block in response.content if getattr(block, 'type', '') == 'text')
+            return schemas.WikiChatResponse(answer=answer, citations=citations, grounded=True)
+        except Exception:
+            pass
     return schemas.WikiChatResponse(answer=context_block, citations=citations, grounded=True)
 
 def rows(table, where='', params=(), order=''):
