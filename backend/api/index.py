@@ -16,7 +16,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, text
 
 from app import config, schemas
-from abl_agents import knowledge_base
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME = Path('/tmp/abl-platform') if os.environ.get('VERCEL') else ROOT
@@ -78,6 +77,7 @@ app.add_middleware(CORSMiddleware, allow_origins=['*'], allow_credentials=False,
 
 @app.post('/api/wiki/chat', response_model=schemas.WikiChatResponse)
 def wiki_chat(req: schemas.WikiChatRequest):
+    from abl_agents import knowledge_base
     hits = knowledge_base.search(req.question, n_results=4)
     citations = [{'source': h.source, 'title': h.title} for h in hits]
     if not hits:
