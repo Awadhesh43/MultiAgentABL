@@ -15,7 +15,8 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, text
 
-from app.routers.wiki import router as wiki_router
+from app import config, schemas
+from abl_agents import knowledge_base
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME = Path('/tmp/abl-platform') if os.environ.get('VERCEL') else ROOT
@@ -74,7 +75,24 @@ def neon_one(sql: str, params: dict):
         row = conn.execute(text(sql), params).mappings().first()
         return dict(row) if row else None
 app.add_middleware(CORSMiddleware, allow_origins=['*'], allow_credentials=False, allow_methods=['*'], allow_headers=['*'])
-app.include_router(wiki_router)
+
+@app.post('/api/wiki/chat', response_model=schemas.WikiChatResponse)
+def wiki_chat(req: schemas.WikiChatRequest):
+    hits = knowledge_base.search(req.question, n_results=4)
+    citations = [{'source': h.source, 'title': h.title} for h in hits]
+    if not hits:
+        return schemas.WikiChatResponse(answer="I couldn't find anything in the knowledge base related to that question.", citations=[], grounded=False)
+    if config.ANTHROPIC_API_KEY:
+        import anthropic
+        context_block = '\\n\\n'.join(f'[{h.source} - {h.title}]\\n{h.text}' for h in hits)
+        response = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY).messages.create(
+            model=config.DEFAULT_MODEL, max_tokens=600, system='You are the ABL Wiki agent. Answer strictly from the provided knowledge base excerpts.',
+            messages=[{'role': 'user', 'content': f'Knowledge base excerpts:\\n\\n{context_block}\\n\\nQuestion: {req.question}'}],
+        )
+        answer = ''.join(block.text for block in response.content if block.type == 'text')
+        return schemas.WikiChatResponse(answer=answer, citations=citations, grounded=True)
+    fallback = '\\n\\n'.join(f'**{h.title}** ({h.source}):\\n{h.text}' for h in hits[:2])
+    return schemas.WikiChatResponse(answer=fallback, citations=citations, grounded=True)
 
 def rows(table, where='', params=(), order=''):
     with sqlite3.connect(DB) as conn:
