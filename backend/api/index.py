@@ -80,7 +80,7 @@ def wiki_chat(req: schemas.WikiChatRequest):
     # Keep retrieval server-local and deterministic in Vercel; Chroma is optional.
     query_terms = {term.lower() for term in re.findall(r'[a-zA-Z0-9]{3,}', req.question)}
     excerpts = []
-    kb_dir = ROOT.parent / 'data' / 'knowledge_base'
+    kb_dir = ROOT / 'data' / 'knowledge_base'
     for path in sorted(kb_dir.glob('*.md')):
         content = path.read_text(encoding='utf-8')
         paragraphs = [p.strip() for p in re.split(r'\\n\\s*\\n', content) if p.strip()]
