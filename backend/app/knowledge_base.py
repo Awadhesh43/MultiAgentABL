@@ -9,12 +9,61 @@ downloaded and needs no separate embeddings API key.
 """
 from __future__ import annotations
 
+import hashlib
+import math
 import re
 from dataclasses import dataclass
 
 import chromadb
 
 from . import config
+
+
+class ABLHashEmbeddingFunction:
+    """Offline deterministic vector embeddings for serverless Chroma."""
+
+    def __init__(self, dimensions: int = 384):
+        self.dimensions = dimensions
+
+    def _embed(self, input: list[str]) -> list[list[float]]:
+        vectors = []
+        for text in input:
+            terms = re.findall(r"[a-z0-9]+", text.lower())
+            features = terms + [f"{a} {b}" for a, b in zip(terms, terms[1:])]
+            vector = [0.0] * self.dimensions
+            for feature in features:
+                digest = hashlib.blake2b(feature.encode(), digest_size=8).digest()
+                index = int.from_bytes(digest[:4], "big") % self.dimensions
+                sign = 1.0 if digest[4] & 1 else -1.0
+                vector[index] += sign
+            norm = math.sqrt(sum(value * value for value in vector)) or 1.0
+            vectors.append([value / norm for value in vector])
+        return vectors
+
+    def __call__(self, input: list[str]) -> list[list[float]]:
+        return self._embed(input)
+
+    def embed_documents(self, input: list[str]) -> list[list[float]]:
+        return self._embed(input)
+
+    def embed_query(self, input: list[str]) -> list[list[float]]:
+        return self._embed(input)
+
+    def name(self) -> str:
+        return "abl-hash-embedding-v1"
+
+    def get_config(self) -> dict:
+        return {"dimensions": self.dimensions}
+
+
+_EMBEDDING_FUNCTION = ABLHashEmbeddingFunction()
+
+
+def _collection(client):
+    return client.get_or_create_collection(
+        config.KB_COLLECTION_NAME,
+        embedding_function=_EMBEDDING_FUNCTION,
+    )
 
 _HEADING_RE = re.compile(r"^##\s+(.*)$", re.MULTILINE)
 
@@ -54,7 +103,7 @@ def ingest(rebuild: bool = True) -> int:
             client.delete_collection(config.KB_COLLECTION_NAME)
         except Exception:
             pass
-    collection = client.get_or_create_collection(config.KB_COLLECTION_NAME)
+    collection = _collection(client)
 
     ids, documents, metadatas = [], [], []
     for path in sorted(config.KNOWLEDGE_BASE_DIR.glob("*.md")):
@@ -72,10 +121,10 @@ def ingest(rebuild: bool = True) -> int:
 
 def search(query: str, n_results: int = 4) -> list[KBHit]:
     client = _get_client()
-    collection = client.get_or_create_collection(config.KB_COLLECTION_NAME)
+    collection = _collection(client)
     if collection.count() == 0:
         ingest()
-        collection = client.get_or_create_collection(config.KB_COLLECTION_NAME)
+        collection = _collection(client)
 
     result = collection.query(query_texts=[query], n_results=n_results)
     hits = []
