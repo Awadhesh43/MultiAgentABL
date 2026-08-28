@@ -78,7 +78,10 @@ app.add_middleware(CORSMiddleware, allow_origins=['*'], allow_credentials=False,
 
 @app.post('/api/wiki/chat', response_model=schemas.WikiChatResponse)
 def wiki_chat(req: schemas.WikiChatRequest):
-    hits = knowledge_base.search(req.question, n_results=4)
+    try:
+        hits = knowledge_base.search(req.question, n_results=4)
+    except Exception:
+        hits = []
     citations = [{'source': hit.source, 'title': hit.title} for hit in hits]
     if not hits:
         return schemas.WikiChatResponse(answer="I couldn't find anything in the knowledge base related to that question.", citations=[], grounded=False)
