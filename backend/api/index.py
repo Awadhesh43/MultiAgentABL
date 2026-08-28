@@ -77,22 +77,34 @@ app.add_middleware(CORSMiddleware, allow_origins=['*'], allow_credentials=False,
 
 @app.post('/api/wiki/chat', response_model=schemas.WikiChatResponse)
 def wiki_chat(req: schemas.WikiChatRequest):
-    from abl_agents import knowledge_base
-    hits = knowledge_base.search(req.question, n_results=4)
-    citations = [{'source': h.source, 'title': h.title} for h in hits]
+    # Keep retrieval server-local and deterministic in Vercel; Chroma is optional.
+    query_terms = {term.lower() for term in re.findall(r'[a-zA-Z0-9]{3,}', req.question)}
+    excerpts = []
+    kb_dir = ROOT.parent / 'data' / 'knowledge_base'
+    for path in sorted(kb_dir.glob('*.md')):
+        content = path.read_text(encoding='utf-8')
+        paragraphs = [p.strip() for p in re.split(r'\\n\\s*\\n', content) if p.strip()]
+        for paragraph in paragraphs:
+            score = sum(term in paragraph.lower() for term in query_terms)
+            if score:
+                title = paragraph.splitlines()[0].lstrip('# ').strip()[:120]
+                excerpts.append((score, path.name, title, paragraph[:1800]))
+    excerpts.sort(key=lambda item: item[0], reverse=True)
+    hits = excerpts[:4]
+    citations = [{'source': source, 'title': title} for _, source, title, _ in hits]
     if not hits:
         return schemas.WikiChatResponse(answer="I couldn't find anything in the knowledge base related to that question.", citations=[], grounded=False)
+    context_block = '\\n\\n'.join(f'[{source} - {title}]\\n{text}' for _, source, title, text in hits)
     if config.ANTHROPIC_API_KEY:
         import anthropic
-        context_block = '\\n\\n'.join(f'[{h.source} - {h.title}]\\n{h.text}' for h in hits)
         response = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY).messages.create(
-            model=config.DEFAULT_MODEL, max_tokens=600, system='You are the ABL Wiki agent. Answer strictly from the provided knowledge base excerpts.',
+            model=config.DEFAULT_MODEL, max_tokens=600,
+            system='You are the ABL Wiki agent. Answer strictly from the provided knowledge base excerpts.',
             messages=[{'role': 'user', 'content': f'Knowledge base excerpts:\\n\\n{context_block}\\n\\nQuestion: {req.question}'}],
         )
-        answer = ''.join(block.text for block in response.content if block.type == 'text')
+        answer = ''.join(block.text for block in response.content if getattr(block, 'type', '') == 'text')
         return schemas.WikiChatResponse(answer=answer, citations=citations, grounded=True)
-    fallback = '\\n\\n'.join(f'**{h.title}** ({h.source}):\\n{h.text}' for h in hits[:2])
-    return schemas.WikiChatResponse(answer=fallback, citations=citations, grounded=True)
+    return schemas.WikiChatResponse(answer=context_block, citations=citations, grounded=True)
 
 def rows(table, where='', params=(), order=''):
     with sqlite3.connect(DB) as conn:
