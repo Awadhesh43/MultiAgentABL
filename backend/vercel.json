@@ -1,6 +1,10 @@
 {
   "version": 2,
-  "includeFiles": ["app/**", "data/knowledge_base/**", "requirements.txt"],
+  "functions": {
+    "api/index.py": {
+      "includeFiles": "data/knowledge_base/**"
+    }
+  },
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/index.py" }
   ],
