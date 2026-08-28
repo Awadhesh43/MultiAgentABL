@@ -15,6 +15,8 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, text
 
+from app.routers.wiki import router as wiki_router
+
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME = Path('/tmp/abl-platform') if os.environ.get('VERCEL') else ROOT
 RUNTIME.mkdir(parents=True, exist_ok=True)
@@ -72,6 +74,7 @@ def neon_one(sql: str, params: dict):
         row = conn.execute(text(sql), params).mappings().first()
         return dict(row) if row else None
 app.add_middleware(CORSMiddleware, allow_origins=['*'], allow_credentials=False, allow_methods=['*'], allow_headers=['*'])
+app.include_router(wiki_router)
 
 def rows(table, where='', params=(), order=''):
     with sqlite3.connect(DB) as conn:

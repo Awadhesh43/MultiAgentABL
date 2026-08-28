@@ -37,7 +37,7 @@ CHROMA_DIR = RUNTIME_DIR / "chroma_db"
 SAMPLE_DOCS_DIR = BACKEND_DIR / "sample_documents"
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-DEFAULT_MODEL = os.environ.get("ABL_AGENT_MODEL", "claude-sonnet-5")
+DEFAULT_MODEL = os.environ.get("ABL_AGENT_MODEL", "claude-sonnet-4-20250514")
 
 CORS_ORIGINS = [
     origin.strip()
