@@ -78,6 +78,19 @@ app.add_middleware(CORSMiddleware, allow_origins=['*'], allow_credentials=False,
 
 @app.post('/api/wiki/chat', response_model=schemas.WikiChatResponse)
 def wiki_chat(req: schemas.WikiChatRequest):
+    scope_terms = {
+        'abl', 'asset', 'based', 'borrowing', 'base', 'advance', 'availability',
+        'receivables', 'inventory', 'collateral', 'covenant', 'field', 'exam',
+        'appraisal', 'dilution', 'dominator', 'lender', 'facility', 'revolver',
+        'working', 'capital', 'perfection', 'eligibility', 'risk', 'rating',
+        'monitoring', 'compliance', 'borrowing-base',
+    }
+    question_terms = set(re.findall(r'[a-z0-9-]+', req.question.lower()))
+    if not question_terms.intersection(scope_terms):
+        return schemas.WikiChatResponse(
+            answer="I can only answer questions about asset-based lending (ABL) and the bank's curated ABL knowledge base. Please ask about borrowing bases, collateral, eligibility, covenants, field exams, or ABL governance.",
+            citations=[], grounded=False,
+        )
     try:
         hits = knowledge_base.search(req.question, n_results=4)
     except Exception:

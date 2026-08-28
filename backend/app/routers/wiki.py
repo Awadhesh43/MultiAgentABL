@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from fastapi import APIRouter
 
 from abl_agents import knowledge_base
@@ -20,6 +22,19 @@ _WIKI_SYSTEM_PROMPT = (
 
 @router.post("/chat", response_model=schemas.WikiChatResponse)
 def chat(req: schemas.WikiChatRequest):
+    scope_terms = {
+        'abl', 'asset', 'based', 'borrowing', 'base', 'advance', 'availability',
+        'receivables', 'inventory', 'collateral', 'covenant', 'field', 'exam',
+        'appraisal', 'dilution', 'dominator', 'lender', 'facility', 'revolver',
+        'working', 'capital', 'perfection', 'eligibility', 'risk', 'rating',
+        'monitoring', 'compliance', 'borrowing-base',
+    }
+    question_terms = set(re.findall(r'[a-z0-9-]+', req.question.lower()))
+    if not question_terms.intersection(scope_terms):
+        return schemas.WikiChatResponse(
+            answer="I can only answer questions about asset-based lending (ABL) and the bank's curated ABL knowledge base. Please ask about borrowing bases, collateral, eligibility, covenants, field exams, or ABL governance.",
+            citations=[], grounded=False,
+        )
     hits = knowledge_base.search(req.question, n_results=4)
     citations = [{"source": h.source, "title": h.title} for h in hits]
 
