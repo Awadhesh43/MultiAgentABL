@@ -195,6 +195,15 @@ def pending_changes(status: str | None = None, deal_id: str | None = None):
 def roles():
     return ['Credit Officer', 'Portfolio Manager', 'Operations Analyst', 'Relationship Manager']
 
+@app.get('/api/approvals')
+def approvals(status: str | None = None, deal_id: str | None = None):
+    """Compatibility alias for clients that call the approvals resource."""
+    return pending_changes(status=status, deal_id=deal_id)
+
+@app.get('/api/approvals/roles')
+def approval_roles():
+    return roles()
+
 @app.get('/api/document-types')
 def document_types():
     types = rows('document_types', order='ORDER BY name')
