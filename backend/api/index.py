@@ -31,7 +31,7 @@ if SOURCE_DB.exists() and (not DB.exists() or DB.stat().st_size == 0):
 app = FastAPI(title='Agentic ABL Platform API', version='0.1.0')
 DATABASE_URL = next((os.environ.get(name) for name in ('POSTGRES_URL', 'DATABASE_URL', 'POSTGRES_PRISMA_URL', 'POSTGRES_URL_NON_POOLING') if (os.environ.get(name) or '').strip().strip('"').strip("'").startswith(('postgres://', 'postgresql://'))), None)
 if not DATABASE_URL:
-    raise RuntimeError('A Neon PostgreSQL connection variable must be configured')
+    DATABASE_URL = f'sqlite:///{DB}'
 DATABASE_URL = DATABASE_URL.strip().strip('"').strip("'")
 if DATABASE_URL.startswith('postgres://'):
     DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql+pg8000://', 1)
@@ -40,11 +40,19 @@ elif DATABASE_URL.startswith('postgresql://') and '+pg8000' not in DATABASE_URL:
 _parts = urlsplit(DATABASE_URL)
 _query = [(key, value) for key, value in parse_qsl(_parts.query, keep_blank_values=True) if key.lower() not in {'sslmode', 'channel_binding', 'ssl_context', 'connect_timeout'}]
 DATABASE_URL = urlunsplit((_parts.scheme, _parts.netloc, _parts.path, urlencode(_query), _parts.fragment))
-NEON_ENGINE = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,
-    connect_args={'ssl_context': ssl.create_default_context()},
-)
+try:
+    NEON_ENGINE = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        connect_args={'ssl_context': ssl.create_default_context()},
+    )
+    with NEON_ENGINE.connect() as _connection:
+        _connection.execute(text('SELECT 1'))
+except Exception as exc:
+    # Keep the standalone deployment bootable when the optional Neon URL is
+    # unavailable; the bundled SQLite snapshot remains a valid read source.
+    print(f'[v0] PostgreSQL unavailable, using bundled SQLite snapshot: {type(exc).__name__}: {exc}')
+    NEON_ENGINE = create_engine(f'sqlite:///{DB}', pool_pre_ping=True)
 
 
 def ensure_neon_schema():
