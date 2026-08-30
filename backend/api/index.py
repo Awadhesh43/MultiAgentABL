@@ -256,11 +256,16 @@ async def upload_document(
             (document_id, deal_id, document_type_id, filename, str(destination), 'pending_review', excerpt, timestamp, uploaded_by),
         )
         conn.commit()
-    return rows('documents', 'WHERE id = ?', (document_id,))[0]
+    document = rows('documents', 'WHERE id = ?', (document_id,))[0]
+    document['extracted_fields'] = []
+    return document
 
 @app.get('/api/documents')
 def documents(deal_id: str | None = None):
-    return rows('documents', 'WHERE deal_id = ?', (deal_id,), 'ORDER BY uploaded_at DESC') if deal_id else rows('documents', order='ORDER BY uploaded_at DESC')
+    documents = rows('documents', 'WHERE deal_id = ?', (deal_id,), 'ORDER BY uploaded_at DESC') if deal_id else rows('documents', order='ORDER BY uploaded_at DESC')
+    for document in documents:
+        document.setdefault('extracted_fields', [])
+    return documents
 
 @app.get('/api/audit')
 def audit(deal_id: str | None = None):

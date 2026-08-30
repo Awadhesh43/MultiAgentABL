@@ -177,7 +177,11 @@ export class Documents implements OnInit {
   openDocument(doc: DocumentRecord): void {
     this.selectedDocument.set(doc);
     const values: Record<string, string> = {};
-    for (const f of doc.extracted_fields) values[f.id] = f.extracted_value;
+    const extractedFields = Array.isArray(doc.extracted_fields) ? doc.extracted_fields : [];
+    if (!Array.isArray(doc.extracted_fields)) {
+      console.warn('[v0] Document response missing extracted_fields; opening with an empty extraction list.', doc.id);
+    }
+    for (const f of extractedFields) values[f.id] = f.extracted_value;
     this.fieldValues.set(values);
     this.fieldMapping.set({});
   }
