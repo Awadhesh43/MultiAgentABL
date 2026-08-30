@@ -149,8 +149,12 @@ def _llm_recommend(deal: Deal, stage_id: str, recent_bbcs: list[BorrowingBaseCer
         tool_choice={"type": "tool", "name": "submit_recommendation"},
         messages=[{"role": "user", "content": user_prompt}],
     )
-    tool_block = next(b for b in response.content if b.type == "tool_use")
-    payload = tool_block.input
+    tool_block = next((b for b in response.content if getattr(b, "type", "") == "tool_use"), None)
+    if tool_block is None:
+        text_blocks = [getattr(b, "text", "") for b in response.content if getattr(b, "type", "") == "text"]
+        payload = {"analysis": "".join(text_blocks), "proposed_changes": []}
+    else:
+        payload = tool_block.input if isinstance(tool_block.input, dict) else {}
     citations = [{"source": h.source, "title": h.title} for h in kb_hits]
     return {
         "agent_name": _AGENT_NAMES.get(stage_id, "ABL Agent"),
