@@ -15,7 +15,8 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, text
 
-from app import config, schemas
+from app import config, schemas, recommendations
+from app.models import BorrowingBaseCertificate, Deal
 from app import knowledge_base
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -184,16 +185,33 @@ STAGE_FLOW = [
 
 @app.post('/api/deals/{deal_id}/stages/{stage_id}/run')
 async def run_stage(deal_id: str, stage_id: str, request: Request):
-    deal = ensure_deal(deal_id)
+    deal_row = ensure_deal(deal_id)
     stage = next((item for item in STAGE_FLOW if item[0] == stage_id), None)
     if not stage:
         raise HTTPException(404, 'Stage not found')
     body = await request.json()
     context = str(body.get('extra_context', '')).strip()
-    text = f"{stage[1]} agent review for {deal.get('borrower_name', 'this deal')}: stage inputs reviewed and next actions identified."
-    if context:
-        text += f" Additional context: {context}"
-    return {'stage': stage_id, 'agent_name': f'{stage[1]} Agent', 'text': text, 'citations': [], 'source': 'rule_based', 'pending_changes': []}
+
+    deal_fields = {column.key for column in Deal.__table__.columns}
+    deal = Deal(**{key: value for key, value in deal_row.items() if key in deal_fields})
+    bbc_rows = neon_rows(
+        'SELECT * FROM borrowing_base_certificates WHERE deal_id = :deal_id ORDER BY created_at ASC',
+        {'deal_id': deal_id},
+    )[-5:]
+    bbc_fields = {column.key for column in BorrowingBaseCertificate.__table__.columns}
+    recent_bbcs = [BorrowingBaseCertificate(**{key: value for key, value in row.items() if key in bbc_fields}) for row in bbc_rows]
+
+    # The shared orchestrator selects the stage agent, retrieves relevant KB context,
+    # and calls Anthropic using config.ANTHROPIC_API_KEY.
+    result = recommendations.run_stage(deal, stage_id, recent_bbcs, context)
+    return {
+        'stage': stage_id,
+        'agent_name': result['agent_name'],
+        'text': result['text'],
+        'citations': result.get('citations', []),
+        'source': result.get('source', 'llm'),
+        'pending_changes': result.get('proposed_changes', []),
+    }
 
 @app.post('/api/deals/{deal_id}/advance-stage')
 async def advance_stage(deal_id: str, request: Request):
