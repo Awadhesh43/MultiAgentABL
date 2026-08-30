@@ -203,7 +203,11 @@ async def run_stage(deal_id: str, stage_id: str, request: Request):
 
     # The shared orchestrator selects the stage agent, retrieves relevant KB context,
     # and calls Anthropic using config.ANTHROPIC_API_KEY.
-    result = recommendations.run_stage(deal, stage_id, recent_bbcs, context)
+    try:
+        result = recommendations.run_stage(deal, stage_id, recent_bbcs, context)
+    except Exception as exc:
+        print(f"[v0] Orchestrated stage agent failed: {type(exc).__name__}: {exc}")
+        raise HTTPException(502, 'The selected ABL agent could not complete its Anthropic analysis.') from exc
     return {
         'stage': stage_id,
         'agent_name': result['agent_name'],

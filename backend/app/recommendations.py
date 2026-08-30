@@ -114,14 +114,10 @@ def _deal_context(deal: Deal, recent_bbcs: list[BorrowingBaseCertificate]) -> di
 
 
 def run_stage(deal: Deal, stage_id: str, recent_bbcs: list[BorrowingBaseCertificate], extra_context: str = "") -> dict:
-    if config.ANTHROPIC_API_KEY:
-        try:
-            return _llm_recommend(deal, stage_id, recent_bbcs, extra_context)
-        except Exception as exc:  # noqa: BLE001 - fall back rather than 500
-            fallback = _rule_based_recommend(deal, stage_id, recent_bbcs)
-            fallback["text"] = f"[LLM call failed ({exc}); showing rule-based fallback]\n\n" + fallback["text"]
-            return fallback
-    return _rule_based_recommend(deal, stage_id, recent_bbcs)
+    """Run the selected lifecycle agent through Anthropic; never silently fall back."""
+    if not config.ANTHROPIC_API_KEY:
+        raise RuntimeError("ANTHROPIC_API_KEY is required for Run Agent")
+    return _llm_recommend(deal, stage_id, recent_bbcs, extra_context)
 
 
 def _llm_recommend(deal: Deal, stage_id: str, recent_bbcs: list[BorrowingBaseCertificate], extra_context: str) -> dict:
@@ -166,7 +162,7 @@ def _llm_recommend(deal: Deal, stage_id: str, recent_bbcs: list[BorrowingBaseCer
 
 
 def _rule_based_recommend(deal: Deal, stage_id: str, recent_bbcs: list[BorrowingBaseCertificate]) -> dict:
-    """Deterministic fallback used when no ANTHROPIC_API_KEY is configured."""
+    """Legacy deterministic helper retained for offline utilities; not used by Run Agent."""
     proposed: list[dict] = []
 
     if stage_id == "covenant_compliance":
