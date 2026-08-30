@@ -195,9 +195,19 @@ async def run_stage(deal_id: str, stage_id: str, request: Request):
 
     # Use attribute-based records so the standalone function does not depend on
     # SQLAlchemy constructor behavior or serialize ORM internals into the prompt.
-    deal = SimpleNamespace(**deal_row)
+    required_deal_fields = {
+        'id': deal_id, 'borrower_name': '', 'industry': '', 'stage': stage_id,
+        'risk_rating': '', 'watchlist': False, 'commitment': 0, 'outstanding_balance': 0,
+        'latest_borrowing_base': 0, 'latest_availability': 0, 'fccr_minimum': 0,
+        'excess_availability_trigger_pct': 0, 'excess_availability_trigger_floor': 0,
+        'trailing_revenue': 0, 'trailing_ebitda': 0, 'unfinanced_capex': 0,
+        'cash_taxes_paid': 0, 'distributions': 0, 'scheduled_debt_service': 0,
+        'annual_rent_and_leases': 0,
+    }
+    required_deal_fields.update({key: value for key, value in deal_row.items() if key in required_deal_fields})
+    deal = SimpleNamespace(**required_deal_fields)
     bbc_rows = neon_rows(
-        'SELECT * FROM borrowing_base_certificates WHERE deal_id = :deal_id ORDER BY created_at ASC',
+        'SELECT period_end, availability, dilution_pct, borrowing_base FROM borrowing_base_certificates WHERE deal_id = :deal_id ORDER BY created_at ASC',
         {'deal_id': deal_id},
     )[-5:]
     recent_bbcs = [SimpleNamespace(**row) for row in bbc_rows]
