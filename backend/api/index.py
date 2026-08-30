@@ -173,6 +173,42 @@ def stage_events(deal_id: str):
     ensure_deal(deal_id)
     return neon_rows('SELECT * FROM stage_events WHERE deal_id = :deal_id ORDER BY entered_at ASC', {'deal_id': deal_id})
 
+STAGE_FLOW = [
+    ('origination', '01 - Origination & Prospecting'),
+    ('underwriting', '02 - Underwriting & Structure'),
+    ('documentation_closing', '03 - Documentation & Closing'),
+    ('covenant_compliance', '04 - Covenant & Compliance'),
+    ('field_exam', '05 - Field Exam & Monitoring'),
+    ('workout_exit', '06 - Workout / Exit'),
+]
+
+@app.post('/api/deals/{deal_id}/stages/{stage_id}/run')
+async def run_stage(deal_id: str, stage_id: str, request: Request):
+    deal = ensure_deal(deal_id)
+    stage = next((item for item in STAGE_FLOW if item[0] == stage_id), None)
+    if not stage:
+        raise HTTPException(404, 'Stage not found')
+    body = await request.json()
+    context = str(body.get('extra_context', '')).strip()
+    text = f"{stage[1]} agent review for {deal.get('borrower_name', 'this deal')}: stage inputs reviewed and next actions identified."
+    if context:
+        text += f" Additional context: {context}"
+    return {'stage': stage_id, 'agent_name': f'{stage[1]} Agent', 'text': text, 'citations': [], 'source': 'rule_based', 'pending_changes': []}
+
+@app.post('/api/deals/{deal_id}/advance-stage')
+async def advance_stage(deal_id: str, request: Request):
+    deal = ensure_deal(deal_id)
+    current = deal.get('stage') or 'origination'
+    index = next((i for i, item in enumerate(STAGE_FLOW) if item[0] == current), 0)
+    if index >= len(STAGE_FLOW) - 1:
+        raise HTTPException(409, 'Deal is already at the final stage')
+    next_stage = STAGE_FLOW[index + 1][0]
+    timestamp = datetime.now(timezone.utc).isoformat()
+    with NEON_ENGINE.begin() as conn:
+        conn.execute(text('UPDATE deals SET stage = :stage, updated_at = :updated_at WHERE id = :id'), {'stage': next_stage, 'updated_at': timestamp, 'id': deal_id})
+        conn.execute(text('INSERT INTO stage_events (id, deal_id, stage, status, notes, entered_at) VALUES (:event_id, :deal_id, :stage, :status, :notes, :entered_at)'), {'event_id': uuid.uuid4().hex[:12], 'deal_id': deal_id, 'stage': next_stage, 'status': 'in_progress', 'notes': '', 'entered_at': timestamp})
+    return {'from_stage': current, 'to_stage': next_stage, 'to_stage_label': STAGE_FLOW[index + 1][1]}
+
 @app.get('/api/deals/{deal_id}/bbc')
 def bbc(deal_id: str, limit: int = 10):
     ensure_deal(deal_id)
