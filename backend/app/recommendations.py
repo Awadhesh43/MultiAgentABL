@@ -134,7 +134,7 @@ def _llm_recommend(deal: Deal, stage_id: str, recent_bbcs: list[BorrowingBaseCer
     )
     ctx = _deal_context(deal, recent_bbcs)
     user_prompt = (
-        f"Deal record:\n{json.dumps(ctx, indent=2)}\n\n"
+        f"Deal record:\n{json.dumps(ctx, indent=2, default=str)}\n\n"
         f"Relevant knowledge base excerpts:\n{kb_block}\n\n"
         f"{('Additional context: ' + extra_context) if extra_context else ''}\n\n"
         "Call submit_recommendation with your analysis and any proposed changes. If nothing should "
