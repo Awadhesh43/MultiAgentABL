@@ -15,8 +15,9 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, text
 
+from types import SimpleNamespace
+
 from app import config, schemas, recommendations
-from app.models import BorrowingBaseCertificate, Deal
 from app import knowledge_base
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -192,14 +193,14 @@ async def run_stage(deal_id: str, stage_id: str, request: Request):
     body = await request.json()
     context = str(body.get('extra_context', '')).strip()
 
-    deal_fields = {column.key for column in Deal.__table__.columns}
-    deal = Deal(**{key: value for key, value in deal_row.items() if key in deal_fields})
+    # Use attribute-based records so the standalone function does not depend on
+    # SQLAlchemy constructor behavior or serialize ORM internals into the prompt.
+    deal = SimpleNamespace(**deal_row)
     bbc_rows = neon_rows(
         'SELECT * FROM borrowing_base_certificates WHERE deal_id = :deal_id ORDER BY created_at ASC',
         {'deal_id': deal_id},
     )[-5:]
-    bbc_fields = {column.key for column in BorrowingBaseCertificate.__table__.columns}
-    recent_bbcs = [BorrowingBaseCertificate(**{key: value for key, value in row.items() if key in bbc_fields}) for row in bbc_rows]
+    recent_bbcs = [SimpleNamespace(**row) for row in bbc_rows]
 
     # The shared orchestrator selects the stage agent, retrieves relevant KB context,
     # and calls Anthropic using config.ANTHROPIC_API_KEY.
