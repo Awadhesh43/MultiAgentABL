@@ -39,7 +39,7 @@ KB_COLLECTION_NAME = "abl_knowledge_base"
 SAMPLE_DOCS_DIR = BACKEND_DIR / "sample_documents"
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-DEFAULT_MODEL = os.environ.get("ABL_AGENT_MODEL", "claude-sonnet-4-20250514")
+DEFAULT_MODEL = os.environ.get("ABL_AGENT_MODEL", "claude-sonnet-4-5-20250929")
 
 CORS_ORIGINS = [
     origin.strip()
