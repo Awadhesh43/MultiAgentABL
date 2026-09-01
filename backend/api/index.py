@@ -144,7 +144,13 @@ def ensure_deal(deal_id: str):
 
 @app.get('/api/health')
 def health():
-    return {'status': 'ok', 'database': DB.exists()}
+    try:
+        with NEON_ENGINE.connect() as conn:
+            conn.execute(text('SELECT 1'))
+        return {'status': 'ok', 'database': 'connected'}
+    except Exception as exc:
+        print(f'[v0] Health database check failed: {type(exc).__name__}: {exc}')
+        return {'status': 'degraded', 'database': 'unavailable'}
 
 @app.get('/api/dashboard')
 def dashboard():
