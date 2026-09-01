@@ -44,7 +44,7 @@ try:
     NEON_ENGINE = create_engine(
         DATABASE_URL,
         pool_pre_ping=True,
-        connect_args={'ssl_context': ssl.create_default_context()},
+        connect_args={},
     )
     with NEON_ENGINE.connect() as _connection:
         _connection.execute(text('SELECT 1'))
@@ -124,6 +124,15 @@ def wiki_chat(req: schemas.WikiChatRequest):
     return schemas.WikiChatResponse(answer=context_block, citations=citations, grounded=True)
 
 def rows(table, where='', params=(), order=''):
+    """Read application rows from managed Postgres; SQLite is local fallback only."""
+    if DATABASE_URL.startswith(('postgresql://', 'postgresql+pg8000://')):
+        query = f'SELECT * FROM {table} {where} {order}'
+        bind = {}
+        for index, value in enumerate(params):
+            token = f':p{index}'
+            query = query.replace('?', token, 1)
+            bind[f'p{index}'] = value
+        return neon_rows(query, bind)
     with sqlite3.connect(DB) as conn:
         conn.row_factory = sqlite3.Row
         return [dict(row) for row in conn.execute(f'SELECT * FROM {table} {where} {order}', params).fetchall()]
@@ -336,12 +345,14 @@ async def upload_document(
     destination = RUNTIME / safe_name
     destination.write_bytes(content)
     excerpt = content.decode('utf-8', errors='ignore')[:3000]
-    with sqlite3.connect(DB) as conn:
-        conn.execute(
-            'INSERT INTO documents (id, deal_id, document_type_id, filename, file_path, status, raw_text_excerpt, uploaded_at, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            (document_id, deal_id, document_type_id, filename, str(destination), 'pending_review', excerpt, timestamp, uploaded_by),
-        )
-        conn.commit()
+    with NEON_ENGINE.begin() as conn:
+        conn.execute(text('''INSERT INTO documents
+            (id, deal_id, document_type_id, filename, file_path, status, raw_text_excerpt, uploaded_at, uploaded_by)
+            VALUES (:id, :deal_id, :document_type_id, :filename, :file_path, :status, :raw_text_excerpt, :uploaded_at, :uploaded_by)'''), {
+                'id': document_id, 'deal_id': deal_id, 'document_type_id': document_type_id,
+                'filename': filename, 'file_path': str(destination), 'status': 'pending_review',
+                'raw_text_excerpt': excerpt, 'uploaded_at': timestamp, 'uploaded_by': uploaded_by,
+            })
     document = rows('documents', 'WHERE id = ?', (document_id,))[0]
     document['extracted_fields'] = []
     return document
