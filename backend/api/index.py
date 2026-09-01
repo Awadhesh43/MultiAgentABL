@@ -17,8 +17,7 @@ from sqlalchemy import create_engine, text
 
 from types import SimpleNamespace
 
-from app import config, schemas, recommendations
-from app import knowledge_base
+from app import config, schemas
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME = Path('/tmp/abl-platform') if os.environ.get('VERCEL') else ROOT
@@ -232,6 +231,8 @@ async def run_stage(deal_id: str, stage_id: str, request: Request):
     # The shared orchestrator selects the stage agent, retrieves relevant KB context,
     # and calls Anthropic using config.ANTHROPIC_API_KEY.
     try:
+        # Keep Chroma/Anthropic imports out of the cold-start path for read APIs.
+        from app import recommendations
         result = recommendations.run_stage(deal, stage_id, recent_bbcs, context)
     except Exception as exc:
         print(f"[v0] Orchestrated stage agent failed: {type(exc).__name__}: {exc}")
