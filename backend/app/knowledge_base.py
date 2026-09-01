@@ -120,16 +120,22 @@ def ingest(rebuild: bool = True) -> int:
 
 
 def search(query: str, n_results: int = 4) -> list[KBHit]:
-    client = _get_client()
-    collection = _collection(client)
-    if collection.count() == 0:
-        ingest()
+    """Retrieve KB context without requiring writable local Chroma storage."""
+    try:
+        client = _get_client()
         collection = _collection(client)
-
-    result = collection.query(query_texts=[query], n_results=n_results)
-    hits = []
-    for doc, meta, dist in zip(
-        result["documents"][0], result["metadatas"][0], result["distances"][0]
-    ):
-        hits.append(KBHit(text=doc, source=meta["source"], title=meta["title"], distance=dist))
-    return hits
+        if collection.count() == 0:
+            ingest()
+            collection = _collection(client)
+        result = collection.query(query_texts=[query], n_results=n_results)
+        return [KBHit(text=doc, source=meta["source"], title=meta["title"], distance=dist)
+                for doc, meta, dist in zip(result["documents"][0], result["metadatas"][0], result["distances"][0])]
+    except Exception as exc:
+        print(f"[v0] Chroma unavailable; using deterministic KB fallback: {type(exc).__name__}: {exc}")
+        query_terms = set(re.findall(r"[a-z0-9]+", query.lower()))
+        candidates = []
+        for path in sorted(config.KNOWLEDGE_BASE_DIR.glob("*.md")):
+            for title, body in _chunk_markdown(path):
+                score = len(query_terms & set(re.findall(r"[a-z0-9]+", (title + " " + body).lower())))
+                candidates.append((score, KBHit(text=f"{title}\n\n{body}", source=path.name, title=title, distance=1.0 - min(score, 10) / 10)))
+        return [hit for _, hit in sorted(candidates, key=lambda item: item[0], reverse=True)[:n_results]]
