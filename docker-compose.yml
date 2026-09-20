@@ -1,0 +1,33 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: abl-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - ABL_DB_DIR=/app/db-store
+    volumes:
+      - db_data:/app/db-store
+      - chroma_data:/app/chroma_db
+      - uploaded_docs:/app/backend/uploaded_docs
+    expose:
+      - "8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: abl-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+volumes:
+  db_data:
+  chroma_data:
+  uploaded_docs:

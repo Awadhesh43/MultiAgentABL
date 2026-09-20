@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import config
 from .db import init_db
-from .routers import agents, audit_router, deals, documents, hitl, wiki
+from .routers import agent_evals, agents, audit_router, deals, documents, hitl, reference, wiki
 
 app = FastAPI(title="Agentic ABL Platform API", version="0.1.0")
 
@@ -30,5 +30,7 @@ app.include_router(deals.router)
 app.include_router(hitl.router)
 app.include_router(audit_router.router)
 app.include_router(documents.router)
+app.include_router(reference.router)
 app.include_router(wiki.router)
 app.include_router(agents.router)
+app.include_router(agent_evals.router)
