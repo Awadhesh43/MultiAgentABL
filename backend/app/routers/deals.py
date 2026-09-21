@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from abl_agents import calculations
 
-from .. import audit, crud, schemas
+from .. import agent_eval, audit, crud, schemas
 from ..db import get_db
 from ..models import BorrowingBaseCertificate, Deal, StageEvent
 
@@ -117,26 +117,31 @@ def get_deal_pending_changes(deal_id: str, db: Session = Depends(get_db)):
 def submit_bbc(deal_id: str, submission: schemas.BBCSubmissionIn, db: Session = Depends(get_db)):
     deal = crud.get_deal_or_404(db, deal_id)
 
-    result = calculations.calculate_borrowing_base(
-        gross_ar=submission.gross_ar,
-        ar_ineligibles=submission.ar_ineligibles,
-        ar_advance_rate=deal.ar_advance_rate,
-        inventory_at_cost=submission.inventory_at_cost,
-        ineligible_inventory=submission.ineligible_inventory,
-        nolv_pct_of_cost=submission.nolv_pct_of_cost,
-        inventory_advance_rate_nolv=deal.inventory_advance_rate_nolv,
-        inventory_cost_cap_pct=deal.inventory_cost_cap_pct,
-        trailing_gross_sales=submission.trailing_gross_sales,
-        trailing_credits_discounts_writeoffs=submission.trailing_credits_discounts_writeoffs,
-        dilution_threshold_pct=deal.dilution_threshold_pct,
-        rent_reserve=submission.rent_reserve,
-        facility_commitment=deal.commitment,
-        outstanding_balance=deal.outstanding_balance,
-        letters_of_credit=deal.letters_of_credit,
-        excess_availability_trigger_pct=deal.excess_availability_trigger_pct,
-        excess_availability_trigger_floor=deal.excess_availability_trigger_floor,
-        requested_draw=submission.requested_draw,
-    )
+    with agent_eval.record(
+        db, "borrowing_base", submission.proposed_by, mode="deterministic", deal_id=deal.id,
+        triggered_by=submission.proposed_by, input_summary=f"Borrowing base certificate for period {submission.period_end}",
+    ) as call:
+        result = calculations.calculate_borrowing_base(
+            gross_ar=submission.gross_ar,
+            ar_ineligibles=submission.ar_ineligibles,
+            ar_advance_rate=deal.ar_advance_rate,
+            inventory_at_cost=submission.inventory_at_cost,
+            ineligible_inventory=submission.ineligible_inventory,
+            nolv_pct_of_cost=submission.nolv_pct_of_cost,
+            inventory_advance_rate_nolv=deal.inventory_advance_rate_nolv,
+            inventory_cost_cap_pct=deal.inventory_cost_cap_pct,
+            trailing_gross_sales=submission.trailing_gross_sales,
+            trailing_credits_discounts_writeoffs=submission.trailing_credits_discounts_writeoffs,
+            dilution_threshold_pct=deal.dilution_threshold_pct,
+            rent_reserve=submission.rent_reserve,
+            facility_commitment=deal.commitment,
+            outstanding_balance=deal.outstanding_balance,
+            letters_of_credit=deal.letters_of_credit,
+            excess_availability_trigger_pct=deal.excess_availability_trigger_pct,
+            excess_availability_trigger_floor=deal.excess_availability_trigger_floor,
+            requested_draw=submission.requested_draw,
+        )
+        call.set_output(f"Borrowing base ${result.borrowing_base:,.0f}; availability ${result.availability:,.0f}")
 
     note = ""
     if result.springing_trigger_breached:
@@ -188,6 +193,7 @@ def submit_bbc(deal_id: str, submission: schemas.BBCSubmissionIn, db: Session = 
             )
         )
 
+    call.update_details(pending_change_ids=[c.id for c in changes])
     db.commit()
     return {
         "bbc": schemas.BBCOut.model_validate(bbc),

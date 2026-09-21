@@ -1,0 +1,335 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <h1>Agent Evaluations</h1>
+      <p class="subtitle">
+        Every agent call is recorded here with how long it took, what it cost in tokens, and how good the answer was.
+        Open a call to see what the agent was given, what it said, and to rate it yourself.
+      </p>
+    </div>
+    <button mat-stroked-button (click)="reload()"><mat-icon>refresh</mat-icon> Refresh</button>
+  </header>
+
+  <details class="how">
+    <summary><mat-icon>help_outline</mat-icon> How each metric is scored</summary>
+    <dl>
+      <dt>Groundedness</dt>
+      <dd>
+        For a written answer: the share of its sentences supported by the context the agent was given (a sentence counts
+        as supported when its closest context sentence is at least 55% similar). For Document Intake: the share of
+        extracted values found in the passage they were read from. Only model-written answers are scored; rule-based and
+        retrieval-only answers are assembled from their context, so scoring them would be meaningless.
+      </dd>
+      <dt>Context relevance</dt>
+      <dd>How closely the passages the agent retrieved matched what it was looking for (average cosine similarity).</dd>
+      <dt>Answer relevance</dt>
+      <dd>How closely the answer matches the question or stage focus it was asked (cosine similarity).</dd>
+      <dt>Accuracy</dt>
+      <dd>
+        Never guessed by a model &mdash; it comes from what people did with the output: the share of extracted values a
+        reviewer accepted unchanged (Document Intake), the share of proposed changes an approver approved (stage and
+        Borrowing Base agents), or a thumbs up/down (ABL Wiki, or any call you rate yourself).
+      </dd>
+      <dt>A note on the proxies</dt>
+      <dd>
+        Groundedness and relevance use the same embedding model as retrieval, so they are fast, free and repeatable, but
+        they are proxies. Open a call to see which sentences were flagged and judge for yourself.
+      </dd>
+    </dl>
+  </details>
+
+  <div class="filters">
+    <mat-form-field appearance="outline">
+      <mat-label>Agent</mat-label>
+      <mat-select [ngModel]="kindFilter()" (ngModelChange)="setFilter('kind', $event)">
+        <mat-option value="">All agents</mat-option>
+        @for (o of kindOptions; track o.value) { <mat-option [value]="o.value">{{ o.label }}</mat-option> }
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>How it answered</mat-label>
+      <mat-select [ngModel]="modeFilter()" (ngModelChange)="setFilter('mode', $event)">
+        <mat-option value="">Any</mat-option>
+        @for (o of modeOptions; track o.value) { <mat-option [value]="o.value">{{ o.label }}</mat-option> }
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Outcome</mat-label>
+      <mat-select [ngModel]="statusFilter()" (ngModelChange)="setFilter('status', $event)">
+        <mat-option value="">Any</mat-option>
+        <mat-option value="success">Success</mat-option>
+        <mat-option value="fallback">Fell back to rules</mat-option>
+        <mat-option value="error">Error</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  @if (loading()) {
+    <div class="loading"><mat-spinner diameter="32"></mat-spinner></div>
+  } @else if (summary(); as s) {
+    <div class="tiles">
+      <div class="tile">
+        <span class="tile-k">Calls</span>
+        <span class="tile-v">{{ s.overall.calls | number }}</span>
+        <span class="tile-s">{{ s.overall.llm_calls }} used an LLM &middot; {{ s.overall.error }} failed &middot; {{ s.overall.fallback }} fell back</span>
+      </div>
+      <div class="tile">
+        <span class="tile-k">Median latency</span>
+        <span class="tile-v">{{ ms(s.overall.latency_p50_ms) }}</span>
+        <span class="tile-s">p95 {{ ms(s.overall.latency_p95_ms) }} &middot; mean {{ ms(s.overall.latency_avg_ms) }}</span>
+      </div>
+      <div class="tile">
+        <span class="tile-k">Tokens used</span>
+        <span class="tile-v">{{ s.overall.input_tokens + s.overall.output_tokens | number }}</span>
+        <span class="tile-s">{{ s.overall.input_tokens | number }} in &middot; {{ s.overall.output_tokens | number }} out</span>
+      </div>
+      <div class="tile">
+        <span class="tile-k">Groundedness</span>
+        <span class="tile-v"><app-metric-bar [value]="s.overall.groundedness" /></span>
+        <span class="tile-s">supported by the agent's own context</span>
+      </div>
+      <div class="tile">
+        <span class="tile-k">Context relevance</span>
+        <span class="tile-v"><app-metric-bar [value]="s.overall.context_relevance" /></span>
+        <span class="tile-s">retrieved passages vs what was sought</span>
+      </div>
+      <div class="tile">
+        <span class="tile-k">Answer relevance</span>
+        <span class="tile-v"><app-metric-bar [value]="s.overall.answer_relevance" /></span>
+        <span class="tile-s">answer vs the question asked</span>
+      </div>
+      <div class="tile">
+        <span class="tile-k">Accuracy</span>
+        <span class="tile-v"><app-metric-bar [value]="s.overall.accuracy" naHint="Nothing has been reviewed yet" /></span>
+        <span class="tile-s">from human review &middot; {{ s.overall.accuracy_evaluated }} of {{ s.overall.calls }} calls reviewed</span>
+      </div>
+      <div class="tile">
+        <span class="tile-k">Human ratings</span>
+        <span class="tile-v rating-v">
+          <span class="up"><mat-icon>thumb_up</mat-icon>{{ s.overall.thumbs_up }}</span>
+          <span class="down"><mat-icon>thumb_down</mat-icon>{{ s.overall.thumbs_down }}</span>
+        </span>
+        <span class="tile-s">explicit verdicts on individual calls</span>
+      </div>
+    </div>
+
+    <h2 class="section-h">By agent</h2>
+    <div class="table by-agent">
+      <div class="row head">
+        <span>Agent</span><span class="num">Calls</span><span class="num">Median</span><span class="num">p95</span>
+        <span class="num">Avg tokens</span><span>Grounded</span><span>Context</span><span>Answer</span><span>Accuracy</span>
+      </div>
+      @for (a of s.by_agent; track a.agent_kind + a.agent_name) {
+        <div class="row">
+          <span class="agent-cell">
+            <strong>{{ a.agent_name }}</strong>
+            <span class="sub">{{ kindLabel(a.agent_kind) }}@if (a.error) { &middot; <span class="err">{{ a.error }} failed</span> }@if (a.fallback) { &middot; {{ a.fallback }} fell back }</span>
+          </span>
+          <span class="num">{{ a.calls }}</span>
+          <span class="num">{{ ms(a.latency_p50_ms) }}</span>
+          <span class="num">{{ ms(a.latency_p95_ms) }}</span>
+          <span class="num">{{ a.avg_tokens_per_llm_call === null ? '—' : (a.avg_tokens_per_llm_call | number) }}</span>
+          <span><app-metric-bar [value]="a.groundedness" /></span>
+          <span><app-metric-bar [value]="a.context_relevance" /></span>
+          <span><app-metric-bar [value]="a.answer_relevance" /></span>
+          <span><app-metric-bar [value]="a.accuracy" naHint="Nothing reviewed yet" [hint]="a.accuracy_evaluated + ' call(s) reviewed'" /></span>
+        </div>
+      } @empty {
+        <p class="empty">No agent calls have been recorded yet. Run a stage agent, ask the Wiki a question, or upload a document.</p>
+      }
+    </div>
+
+    <h2 class="section-h">Every call <span class="count">{{ calls().length }}</span></h2>
+    <div class="table calls">
+      <div class="row head">
+        <span>Time</span><span>Agent</span><span>Mode</span><span class="num">Latency</span><span class="num">Tokens in / out</span>
+        <span>Grounded</span><span>Context</span><span>Answer</span><span>Accuracy</span><span>Rated</span>
+      </div>
+      @for (c of calls(); track c.id) {
+        <button type="button" class="row clickable" [class.open]="expandedId() === c.id" [class.failed]="c.status === 'error'" (click)="toggle(c)">
+          <span class="mono-num">{{ c.created_at | date: 'MMM d, HH:mm:ss' }}</span>
+          <span class="agent-cell">
+            <strong>{{ c.agent_name }}</strong>
+            <span class="sub">{{ c.deal_name || c.input_summary }}</span>
+          </span>
+          <span>
+            <span class="badge" [class]="c.status === 'error' ? 'badge-blocked' : c.status === 'fallback' ? 'badge-warn' : c.mode === 'llm' ? 'badge-elevated' : 'badge-pending'">
+              {{ c.status === 'error' ? 'Error' : c.status === 'fallback' ? 'Fell back' : modeLabel(c.mode) }}
+            </span>
+          </span>
+          <span class="num">{{ ms(c.latency_ms) }}</span>
+          <span class="num">{{ tokens(c) }}</span>
+          <span><app-metric-bar [value]="c.groundedness" /></span>
+          <span><app-metric-bar [value]="c.context_relevance" /></span>
+          <span><app-metric-bar [value]="c.answer_relevance" /></span>
+          <span><app-metric-bar [value]="c.accuracy" naHint="Not reviewed yet" [hint]="c.accuracy_basis" /></span>
+          <span class="rated">
+            @if (c.human_rating === 'up') { <mat-icon class="up" matTooltip="Rated thumbs up by {{ c.rated_by }}">thumb_up</mat-icon> }
+            @else if (c.human_rating === 'down') { <mat-icon class="down" matTooltip="Rated thumbs down by {{ c.rated_by }}">thumb_down</mat-icon> }
+            @else { <span class="na">&mdash;</span> }
+          </span>
+        </button>
+
+        @if (expandedId() === c.id) {
+          <div class="detail">
+            @if (detailLoading()) {
+              <div class="loading small"><mat-spinner diameter="24"></mat-spinner></div>
+            } @else if (detail(); as d) {
+              @if (d.status !== 'success') {
+                <p class="notice" [class.notice-bad]="d.status === 'error'" [class.notice-warn]="d.status === 'fallback'">
+                  <mat-icon>{{ d.status === 'error' ? 'error_outline' : 'warning_amber' }}</mat-icon>
+                  <span>
+                    @if (d.status === 'error') { This call failed: } @else { The LLM call failed, so the rule-based answer was used instead: }
+                    <code>{{ d.error }}</code>
+                  </span>
+                </p>
+              }
+              @if (d.details.eval_error) {
+                <p class="notice notice-warn"><mat-icon>warning_amber</mat-icon><span>Scoring this call failed: <code>{{ d.details.eval_error }}</code></span></p>
+              }
+
+              <div class="detail-grid">
+                <div class="col">
+                  <h3>Asked</h3>
+                  <p class="text-box">{{ d.input_summary }}</p>
+                  <h3>Answered</h3>
+                  <p class="text-box scroll">{{ d.output_summary || '(no answer recorded)' }}</p>
+                </div>
+
+                <div class="col">
+                  <h3>Performance</h3>
+                  <dl class="facts">
+                    <dt>Total latency</dt><dd class="mono-num">{{ ms(d.latency_ms) }}</dd>
+                    @if (d.retrieval_ms !== null) { <dt>Retrieval</dt><dd class="mono-num">{{ ms(d.retrieval_ms) }}</dd> }
+                    @if (d.llm_ms !== null) { <dt>LLM call</dt><dd class="mono-num">{{ ms(d.llm_ms) }}</dd> }
+                    <dt>Other</dt><dd class="mono-num">{{ ms(otherMs(d)) }}</dd>
+                    @if (d.input_tokens !== null) {
+                      <dt>Tokens in</dt><dd class="mono-num">{{ d.input_tokens | number }}</dd>
+                      <dt>Tokens out</dt><dd class="mono-num">{{ d.output_tokens | number }}</dd>
+                      @if (d.cache_read_tokens || d.cache_write_tokens) {
+                        <dt>Cache read / write</dt><dd class="mono-num">{{ d.cache_read_tokens | number }} / {{ d.cache_write_tokens | number }}</dd>
+                      }
+                    } @else {
+                      <dt>Tokens</dt><dd>none &mdash; no LLM was called</dd>
+                    }
+                    @if (d.model) { <dt>Model</dt><dd class="mono">{{ d.model }}</dd> }
+                    @if (d.details.stop_reason) {
+                      <dt>Stop reason</dt>
+                      <dd class="mono" [class.warn-text]="d.details.stop_reason === 'max_tokens'">{{ d.details.stop_reason }}@if (d.details.stop_reason === 'max_tokens') { (answer was cut off) }</dd>
+                    }
+                  </dl>
+
+                  <h3>Quality</h3>
+                  <dl class="facts">
+                    <dt>Groundedness</dt><dd><app-metric-bar [value]="d.groundedness" /></dd>
+                    <dt>Context relevance</dt><dd><app-metric-bar [value]="d.context_relevance" /></dd>
+                    <dt>Answer relevance</dt><dd><app-metric-bar [value]="d.answer_relevance" /></dd>
+                    <dt>Accuracy</dt>
+                    <dd><app-metric-bar [value]="d.accuracy" naHint="Not reviewed yet" /> <span class="basis">{{ d.accuracy_basis }}</span></dd>
+                  </dl>
+                </div>
+              </div>
+
+              @if (d.agent_kind === 'document_intake') {
+                <h3>
+                  Extracted values
+                  @if (d.document_id) {
+                    <a class="link" [routerLink]="['/documents', d.document_id, 'reference']"><mat-icon>fact_check</mat-icon> Open the reference view</a>
+                  }
+                </h3>
+                <div class="mini-table">
+                  <div class="mrow head"><span>Key term</span><span>Agent extracted</span><span>Now</span><span>Page</span><span>Section</span><span>In source</span><span>Review</span></div>
+                  @for (f of d.intake_fields; track f.field_id) {
+                    <div class="mrow">
+                      <span>{{ f.label }}</span>
+                      <span class="mono">{{ f.original_value || 'not found' }}</span>
+                      <span class="mono" [class.warn-text]="f.value !== f.original_value">{{ f.value !== f.original_value ? f.value : 'unchanged' }}</span>
+                      <span>{{ f.page ?? '—' }}</span>
+                      <span class="clip" [matTooltip]="f.section">{{ f.section || '—' }}</span>
+                      <span>
+                        @if (f.grounded === true) { <mat-icon class="up">check</mat-icon> }
+                        @else if (f.grounded === false) { <mat-icon class="down">close</mat-icon> }
+                        @else { <span class="na">&mdash;</span> }
+                      </span>
+                      <span><app-status-badge [status]="f.status === 'confirmed' ? 'approved' : f.status === 'rejected' ? 'rejected' : 'pending'" /></span>
+                    </div>
+                  }
+                </div>
+                <p class="facts-line">
+                  {{ detailNum(d, 'chunk_count') }} passages indexed &middot; {{ detailNum(d, 'semantic') }} found by semantic search,
+                  {{ detailNum(d, 'regex_fallback') }} by whole-document search, {{ detailNum(d, 'not_found') }} not found
+                  &middot; coverage {{ detailNum(d, 'coverage') | percent: '1.0-0' }}
+                  &middot; chunking {{ ms(detailNum(d, 'chunking_ms')) }}, embedding {{ ms(detailNum(d, 'indexing_ms')) }}, retrieval {{ ms(detailNum(d, 'retrieval_ms')) }}
+                </p>
+              }
+
+              @if (retrievalOf(d).length) {
+                <h3>Passages retrieved</h3>
+                <div class="mini-table">
+                  <div class="mrow head r3"><span>Source</span><span>Section</span><span>Match</span></div>
+                  @for (r of retrievalOf(d); track $index) {
+                    <div class="mrow r3">
+                      <span class="mono">{{ r.source }}</span><span>{{ r.title }}</span>
+                      <span><app-metric-bar [value]="similarity(r.distance)" /></span>
+                    </div>
+                  }
+                </div>
+              }
+
+              @if (sentencesOf(d).length) {
+                <h3>Is each sentence supported? <span class="count">threshold 55% similarity</span></h3>
+                <ul class="sentences">
+                  @for (s of sentencesOf(d); track $index) {
+                    <li [class.unsupported]="!s.supported">
+                      <mat-icon>{{ s.supported ? 'check_circle' : 'help' }}</mat-icon>
+                      <div>
+                        <span class="sentence">{{ s.sentence }}</span>
+                        <span class="support">
+                          {{ s.supported ? 'Supported' : 'Not supported by the context provided' }} &middot; {{ s.support | percent: '1.0-0' }}
+                          &middot; closest: &ldquo;{{ s.closest_context }}&rdquo;
+                        </span>
+                      </div>
+                    </li>
+                  }
+                </ul>
+              }
+
+              @if (d.proposed_changes.length) {
+                <h3>Changes it proposed</h3>
+                <div class="mini-table">
+                  <div class="mrow head r4"><span>Field</span><span>New value</span><span>Guardrail</span><span>Decision</span></div>
+                  @for (p of d.proposed_changes; track p.id) {
+                    <div class="mrow r4">
+                      <span class="mono">{{ p.field_path }}</span><span class="mono">{{ p.new_value }}</span>
+                      <span>{{ p.guardrail_status.replace('_', ' ') }}</span>
+                      <span><app-status-badge [status]="p.status" /></span>
+                    </div>
+                  }
+                </div>
+              }
+
+              <h3>Your evaluation</h3>
+              <div class="rate">
+                <button mat-stroked-button [class.picked-up]="d.human_rating === 'up'" [disabled]="saving()" (click)="rate(d, 'up')">
+                  <mat-icon>thumb_up</mat-icon> Good answer
+                </button>
+                <button mat-stroked-button [class.picked-down]="d.human_rating === 'down'" [disabled]="saving()" (click)="rate(d, 'down')">
+                  <mat-icon>thumb_down</mat-icon> Poor answer
+                </button>
+                <mat-form-field appearance="outline" class="notes">
+                  <mat-label>Notes (saved with your rating)</mat-label>
+                  <input matInput [ngModel]="notes()" (ngModelChange)="notes.set($event)" placeholder="e.g. invented a covenant threshold" />
+                </mat-form-field>
+              </div>
+              @if (d.human_rating) {
+                <p class="basis">Rated {{ ratedLabel(d) }} by {{ d.rated_by }} on {{ d.rated_at | date: 'MMM d, HH:mm:ss' }}. Click the same button again to clear it.</p>
+              }
+            }
+          </div>
+        }
+      } @empty {
+        <p class="empty">No calls match these filters.</p>
+      }
+    </div>
+  }
+</div>

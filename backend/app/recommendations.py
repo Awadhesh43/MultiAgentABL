@@ -9,6 +9,7 @@ demo and the web app, and reuses calculations.py for anything numeric.
 from __future__ import annotations
 
 import json
+from time import perf_counter
 
 from abl_agents import calculations, knowledge_base
 
@@ -113,13 +114,31 @@ def _deal_context(deal: Deal, recent_bbcs: list[BorrowingBaseCertificate]) -> di
     }
 
 
+def agent_name_for(stage_id: str) -> str:
+    return _AGENT_NAMES.get(stage_id, "ABL Agent")
+
+
+def _facts(data, prefix: str = "") -> list[str]:
+    """Flattens the deal record into one short "field: value" line per fact, so
+    an answer sentence can be checked against individual facts rather than a JSON blob."""
+    if isinstance(data, dict):
+        return [line for k, v in data.items() for line in _facts(v, f"{prefix}{k.replace('_', ' ')} ")]
+    if isinstance(data, list):
+        return [line for i, item in enumerate(data) for line in _facts(item, f"{prefix}{i + 1} ")]
+    return [f"{prefix.strip()}: {data}"]
+
+
 def run_stage(deal: Deal, stage_id: str, recent_bbcs: list[BorrowingBaseCertificate], extra_context: str = "") -> dict:
+    """The returned dict's "_eval" entry is not part of the recommendation: it
+    carries what the agent eval view needs (timings, token usage, the context the
+    model was given, or why the LLM path was abandoned)."""
     if config.ANTHROPIC_API_KEY:
         try:
             return _llm_recommend(deal, stage_id, recent_bbcs, extra_context)
         except Exception as exc:  # noqa: BLE001 - fall back rather than 500
             fallback = _rule_based_recommend(deal, stage_id, recent_bbcs)
             fallback["text"] = f"[LLM call failed ({exc}); showing rule-based fallback]\n\n" + fallback["text"]
+            fallback["_eval"] = {"llm_error": f"{type(exc).__name__}: {exc}"}
             return fallback
     return _rule_based_recommend(deal, stage_id, recent_bbcs)
 
@@ -128,7 +147,10 @@ def _llm_recommend(deal: Deal, stage_id: str, recent_bbcs: list[BorrowingBaseCer
     import anthropic
 
     client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
-    kb_hits = knowledge_base.search(_STAGE_KB_QUERY.get(stage_id, stage_id), n_results=3)
+    kb_query = _STAGE_KB_QUERY.get(stage_id, stage_id)
+    started = perf_counter()
+    kb_hits = knowledge_base.search(kb_query, n_results=3)
+    retrieval_ms = (perf_counter() - started) * 1000
     kb_block = "\n\n".join(f"[{h.source} - {h.title}]\n{h.text}" for h in kb_hits)
 
     system_prompt = _SYSTEM_PROMPTS.get(
@@ -145,6 +167,7 @@ def _llm_recommend(deal: Deal, stage_id: str, recent_bbcs: list[BorrowingBaseCer
         "change, submit an empty proposed_changes list."
     )
 
+    started = perf_counter()
     response = client.messages.create(
         model=config.DEFAULT_MODEL,
         max_tokens=1200,
@@ -153,6 +176,7 @@ def _llm_recommend(deal: Deal, stage_id: str, recent_bbcs: list[BorrowingBaseCer
         tool_choice={"type": "tool", "name": "submit_recommendation"},
         messages=[{"role": "user", "content": user_prompt}],
     )
+    llm_ms = (perf_counter() - started) * 1000
     tool_block = next(b for b in response.content if b.type == "tool_use")
     payload = tool_block.input
     citations = [{"source": h.source, "title": h.title} for h in kb_hits]
@@ -162,6 +186,17 @@ def _llm_recommend(deal: Deal, stage_id: str, recent_bbcs: list[BorrowingBaseCer
         "citations": citations,
         "source": "llm",
         "proposed_changes": payload.get("proposed_changes", []),
+        "_eval": {
+            "usage": response.usage,
+            "model": getattr(response, "model", config.DEFAULT_MODEL),
+            "stop_reason": getattr(response, "stop_reason", None),
+            "retrieval_ms": round(retrieval_ms, 1),
+            "llm_ms": round(llm_ms, 1),
+            "query": f"{_AGENT_NAMES.get(stage_id, 'ABL Agent')}: {kb_query} for {deal.borrower_name}",
+            "context": [*_facts(ctx), *[h.text for h in kb_hits], *([extra_context] if extra_context else [])],
+            "retrieval_distances": [h.distance for h in kb_hits],
+            "retrieval": [{"source": h.source, "title": h.title, "distance": round(h.distance, 4)} for h in kb_hits],
+        },
     }
 
 
