@@ -42,9 +42,7 @@ SAMPLE_DOCS_DIR = BACKEND_DIR / "sample_documents"
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 DEFAULT_MODEL = os.environ.get("ABL_AGENT_MODEL", "claude-sonnet-5")
 
-_cors_origins = os.environ.get("CORS_ORIGINS")
-CORS_ORIGINS = (
-    [origin.strip() for origin in _cors_origins.split(",") if origin.strip()]
-    if _cors_origins
-    else ["http://localhost:3000", "http://localhost:4200", "http://127.0.0.1:4200"]
-)
+CORS_ORIGINS = [
+    "http://localhost:4200",
+    "http://127.0.0.1:4200",
+]

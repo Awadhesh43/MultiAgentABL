@@ -10,7 +10,7 @@ app = FastAPI(title="Agentic ABL Platform API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.CORS_ORIGINS,
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
