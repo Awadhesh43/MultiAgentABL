@@ -11,9 +11,19 @@ the line that actually states its value.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
-from io import BytesIO
-from pathlib import Path
+from dataclasses import dataclass, field
+
+
+@dataclass
+class EvidenceRef:
+    """A chunk the extractor looked at for one key term, and what came of it.
+    `outcome` is one of: selected, selected_untyped, selected_fallback,
+    no_value_in_chunk, type_mismatch, not_examined."""
+    chunk_index: int
+    outcome: str
+    used: bool = False
+    distance: float | None = None
+    value_text: str = ""  # the raw text in the chunk the value was read from
 
 
 @dataclass
@@ -23,34 +33,38 @@ class ExtractionCandidate:
     value: str
     confidence: float
     match_method: str = "regex"
+    evidence: list[EvidenceRef] = field(default_factory=list)
+
+
+@dataclass
+class ChunkRecord:
+    """A document chunk plus where it sits in the source document."""
+    index: int
+    text: str
+    granularity: str
+    char_start: int
+    page: int | None
+    page_source: str
+    section: str
+
+
+@dataclass
+class IntakeResult:
+    """Everything one Document Intake Agent run produces: the extracted values,
+    the chunks they were read from (with page/section), and run metrics."""
+    candidates: list[ExtractionCandidate]
+    chunks: list[ChunkRecord]
+    metrics: dict = field(default_factory=dict)
+    page_count: int | None = None
+    page_source: str = "none"
 
 
 def extract_text(filename: str, content: bytes) -> str:
-    suffix = Path(filename).suffix.lower()
-    if suffix == ".pdf":
-        return _extract_pdf(content)
-    if suffix == ".docx":
-        return _extract_docx(content)
-    # .txt and anything else: best-effort decode
-    return content.decode("utf-8", errors="ignore")
+    """Just the text. Callers that also need page/section provenance use
+    document_structure.extract_document, which produces this same text."""
+    from .document_structure import extract_document
 
-
-def _extract_pdf(content: bytes) -> str:
-    from pypdf import PdfReader
-
-    reader = PdfReader(BytesIO(content))
-    return "\n".join(page.extract_text() or "" for page in reader.pages)
-
-
-def _extract_docx(content: bytes) -> str:
-    import docx
-
-    document = docx.Document(BytesIO(content))
-    parts = [p.text for p in document.paragraphs]
-    for table in document.tables:
-        for row in table.rows:
-            parts.append(" | ".join(cell.text for cell in row.cells))
-    return "\n".join(parts)
+    return extract_document(filename, content).text
 
 
 _NUMBER_RE = re.compile(r"(-)?\$?\s*(-)?([\d,]+(?:\.\d+)?)")
@@ -96,6 +110,8 @@ def typed_value(data_type: str, segment: str) -> tuple[str, bool]:
             return _NUMBER_CLEAN_RE.sub("", _signed_digits(m)), True
     elif data_type == "currency":
         m = _NUMBER_RE.search(segment)
+        if m and not any(c.isdigit() for c in m.group(3)):
+            return "", False  # a stray comma with no digits isn't an amount (float('') would raise)
         if m:
             # Reformatted through _format_currency, not just $-prefixed --
             # a "currency" field's value should always read as "$11,600,000"
@@ -154,6 +170,47 @@ def match_value_in_text(text: str, label: str, aliases: list[str], data_type: st
         confidence -= 0.25
     confidence = max(0.0, min(confidence, 0.99))
     return value, round(confidence, 2), "regex", typed_ok
+
+
+def _typed_match(data_type: str, segment: str) -> re.Match | None:
+    """The regex match typed_value would use for this data_type (kept in step with it)."""
+    if data_type in ("number", "currency"):
+        return _NUMBER_RE.search(segment)
+    if data_type == "percent":
+        return _PERCENT_RE.search(segment)
+    if data_type == "date":
+        return _DATE_RE.search(segment)
+    return None
+
+
+def locate_value_span(text: str, label: str, aliases: list[str], data_type: str) -> tuple[int, int] | None:
+    """Where in `text` match_value_in_text reads its value from, as (start, end)
+    offsets of the raw text -- e.g. "5500000" even though the extracted value is
+    the reformatted "$5,500,000". Used to highlight the value in the source
+    screenshot. None if there is no match, mirroring match_value_in_text."""
+    phrases = sorted([label, *aliases], key=len, reverse=True)
+    phrases = [p for p in phrases if p.strip()]
+    if not phrases:
+        return None
+
+    alt = "|".join(re.escape(p) for p in phrases)
+    match = re.compile(rf"(?:{alt})\s*[:\-–]?\s*(.{{0,100}})", re.IGNORECASE).search(text)
+    if not match:
+        return None
+
+    segment_start = match.start(1)
+    segment = match.group(1).split("\n")[0]
+
+    typed = _typed_match(data_type, segment)
+    if typed:
+        start, end = typed.span(0)  # the whole token, e.g. "$ 5,500,000" or "12.5%"
+        return segment_start + start, segment_start + end
+
+    stripped = segment.strip()
+    if not stripped:
+        return None
+    lead = len(segment) - len(segment.lstrip())
+    return segment_start + lead, segment_start + lead + len(stripped[:80])
 
 
 def extract_fields(text: str, key_terms: list[dict]) -> list[ExtractionCandidate]:

@@ -5,13 +5,14 @@ recreates the database file first.
 """
 from __future__ import annotations
 
+import shutil
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import chromadb  # noqa: E402
-from app import audit, config, crud, document_intake_agent  # noqa: E402
+from app import agent_eval, audit, config, crud, document_intake_agent, evidence  # noqa: E402
 from app.db import SessionLocal, engine, init_db  # noqa: E402
 from app.models import (  # noqa: E402
     Base, BorrowingBaseCertificate, Deal, Document, DocumentType,
@@ -151,15 +152,28 @@ Capital Expenditures: $610,000
         )
         db.add(doc)
         db.flush()  # assigns doc.id, which scopes the semantic chunk search below
-        candidates = document_intake_agent.run(doc.id, filename, text, key_terms)
-        for c in candidates:
-            db.add(ExtractedField(
+        with agent_eval.record(
+            db, "document_intake", "Document Intake Agent", mode="retrieval", deal_id=deal_id, document_id=doc.id,
+            triggered_by=uploaded_by, input_summary=f"{filename} ({doc_type.name}): {len(key_terms)} key terms",
+        ) as call:
+            result = document_intake_agent.run(doc.id, filename, text, key_terms)
+            call.eval_input = {"intake": result, "key_terms": key_terms}
+            call.set_output("\n".join(
+                f"{c.label}: {c.value or '(not found)'}  [{c.match_method}, {c.confidence:.0%}]" for c in result.candidates
+            ))
+        fields = []
+        for c in result.candidates:
+            field = ExtractedField(
                 document_id=doc.id, key_term_id=c.key_term_id, label=c.label,
-                extracted_value=c.value, confidence=c.confidence, match_method=c.match_method,
+                extracted_value=c.value, original_value=c.value, confidence=c.confidence, match_method=c.match_method,
                 status="confirmed" if all_confirmed and c.value else "pending_review",
                 reviewed_by=uploaded_by if all_confirmed else "",
                 reviewed_at=days_ago(2) if all_confirmed else None,
-            ))
+            )
+            db.add(field)
+            fields.append(field)
+        db.flush()
+        evidence.attach_evidence(db, doc.id, result, fields)
         audit.append(
             db, event_type="document_uploaded", actor=uploaded_by, deal_id=deal_id or "",
             summary=f"Uploaded {filename} as {doc_type.name}",
@@ -417,6 +431,9 @@ def seed_historical_decisions(db, deals: dict[str, Deal]) -> None:
 def main() -> None:
     if config.DB_PATH.exists():
         config.DB_PATH.unlink()
+    # Document ids are regenerated below, so the cached source screenshots of the
+    # old ones would be orphaned.
+    shutil.rmtree(config.EVIDENCE_DIR, ignore_errors=True)
     init_db()
 
     # Re-running the seed script generates fresh document ids, so also reset

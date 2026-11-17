@@ -209,6 +209,7 @@ class Document(Base):
     deal: Mapped[Deal | None] = relationship(back_populates="documents")
     document_type: Mapped[DocumentType] = relationship()
     extracted_fields: Mapped[list["ExtractedField"]] = relationship(back_populates="document", cascade="all, delete-orphan")
+    chunks: Mapped[list["DocumentChunk"]] = relationship(back_populates="document", cascade="all, delete-orphan")
 
 
 class ExtractedField(Base):
@@ -221,6 +222,10 @@ class ExtractedField(Base):
     key_term_id: Mapped[str] = mapped_column(String)
     label: Mapped[str] = mapped_column(String)
     extracted_value: Mapped[str] = mapped_column(String, default="")
+    # What the agent originally extracted. `extracted_value` is overwritten when
+    # a reviewer edits it, so this is what lets the agent eval view measure how
+    # often a human had to change the agent's answer. '' on rows that predate it.
+    original_value: Mapped[str] = mapped_column(String, default="", server_default="")
     confidence: Mapped[float] = mapped_column(Float, default=0.0)
     match_method: Mapped[str] = mapped_column(String, default="regex")
     status: Mapped[str] = mapped_column(String, default="pending_review")  # pending_review | confirmed | rejected
@@ -228,3 +233,92 @@ class ExtractedField(Base):
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     document: Mapped[Document] = relationship(back_populates="extracted_fields")
+    evidence: Mapped[list["FieldEvidence"]] = relationship(
+        back_populates="field", cascade="all, delete-orphan", order_by="FieldEvidence.rank",
+    )
+
+
+class DocumentChunk(Base):
+    """One retrievable passage of an uploaded document, with where it sits in
+    the source (page + section). This is what the reference view shows a human
+    when they check where an extracted value came from."""
+    __tablename__ = "document_chunks"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uid)
+    document_id: Mapped[str] = mapped_column(ForeignKey("documents.id"))
+    chunk_index: Mapped[int] = mapped_column(Integer)  # same index stored in the Chroma chunk metadata
+    text: Mapped[str] = mapped_column(Text)
+    granularity: Mapped[str] = mapped_column(String, default="paragraph")  # paragraph | line
+    char_start: Mapped[int] = mapped_column(Integer, default=0)  # offset into the document's extracted text
+    page: Mapped[int | None] = mapped_column(Integer, nullable=True)  # null when the format has no pages
+    # pdf = exact | docx_markers = from Word's saved page breaks, approximate | none = no pagination
+    page_source: Mapped[str] = mapped_column(String, default="none")
+    section: Mapped[str] = mapped_column(String, default="")  # heading breadcrumb, e.g. "1. ELIGIBLE AR > A/R Advance"
+
+    document: Mapped[Document] = relationship(back_populates="chunks")
+
+
+class FieldEvidence(Base):
+    """Links an extracted field to the chunk(s) the extractor looked at for it.
+    rank 0 is the chunk the value was actually taken from (when one was); the
+    rest are the other retrieval candidates and why each was passed over."""
+    __tablename__ = "field_evidence"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uid)
+    field_id: Mapped[str] = mapped_column(ForeignKey("extracted_fields.id"))
+    chunk_id: Mapped[str] = mapped_column(ForeignKey("document_chunks.id"))
+    rank: Mapped[int] = mapped_column(Integer, default=0)
+    used: Mapped[bool] = mapped_column(Boolean, default=False)
+    # selected | selected_untyped | selected_fallback | no_value_in_chunk | type_mismatch | not_examined
+    outcome: Mapped[str] = mapped_column(String, default="not_examined")
+    distance: Mapped[float | None] = mapped_column(Float, nullable=True)  # Chroma distance; null for regex fallback
+    value_text: Mapped[str] = mapped_column(String, default="")  # the raw text in the chunk the value was read from
+
+    field: Mapped[ExtractedField] = relationship(back_populates="evidence")
+    chunk: Mapped[DocumentChunk] = relationship()
+
+
+class AgentCall(Base):
+    """One row per agent invocation -- the source for the agent eval view.
+    Ids of deals/documents/proposed changes are plain strings (no foreign
+    keys) so a call record stays valid on its own."""
+    __tablename__ = "agent_calls"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uid)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+    agent_kind: Mapped[str] = mapped_column(String)  # document_intake | stage_agent | wiki | borrowing_base
+    agent_name: Mapped[str] = mapped_column(String)
+    mode: Mapped[str] = mapped_column(String, default="")  # llm | rule_based | retrieval | deterministic
+    status: Mapped[str] = mapped_column(String, default="success")  # success | fallback | error
+    error: Mapped[str] = mapped_column(Text, default="")
+    model: Mapped[str] = mapped_column(String, default="")
+
+    deal_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    document_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    stage_id: Mapped[str] = mapped_column(String, default="")
+    triggered_by: Mapped[str] = mapped_column(String, default="")
+    input_summary: Mapped[str] = mapped_column(Text, default="")
+    output_summary: Mapped[str] = mapped_column(Text, default="")
+
+    # performance
+    latency_ms: Mapped[float] = mapped_column(Float, default=0.0)
+    retrieval_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    llm_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cache_read_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cache_write_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # automated quality metrics, 0..1; null means "doesn't apply to this call"
+    groundedness: Mapped[float | None] = mapped_column(Float, nullable=True)
+    context_relevance: Mapped[float | None] = mapped_column(Float, nullable=True)
+    answer_relevance: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # explicit human evaluation
+    human_rating: Mapped[str | None] = mapped_column(String, nullable=True)  # up | down
+    human_notes: Mapped[str] = mapped_column(Text, default="")
+    rated_by: Mapped[str] = mapped_column(String, default="")
+    rated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    details: Mapped[dict] = mapped_column(JSON, default=dict)

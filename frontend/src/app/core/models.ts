@@ -219,6 +219,187 @@ export interface StageRunResponse {
   pending_changes: PendingChange[];
 }
 
+// ---- document reference view ----
+
+export type PageSource = 'pdf' | 'docx_markers' | 'none';
+
+export interface Evidence {
+  evidence_id: string;
+  rank: number;
+  used: boolean;
+  outcome: 'selected' | 'selected_untyped' | 'selected_fallback' | 'no_value_in_chunk' | 'type_mismatch' | 'not_examined';
+  distance: number | null;
+  similarity: number | null;
+  page: number | null;
+  page_source: PageSource;
+  section: string;
+  granularity: 'paragraph' | 'line';
+  text: string;
+  value_text: string;
+  image_url: string;
+  page_image_url: string;
+}
+
+export interface ReferenceField {
+  field_id: string;
+  label: string;
+  data_type: KeyTerm['data_type'];
+  value: string;
+  original_value: string;
+  edited: boolean;
+  confidence: number;
+  match_method: string;
+  status: ExtractedField['status'];
+  reviewed_by: string;
+  grounded: boolean | null;
+  evidence: Evidence[];
+}
+
+export interface ReferenceSection {
+  title: string;
+  page_start: number | null;
+  page_end: number | null;
+  chunk_count: number;
+  field_labels: string[];
+}
+
+export interface ReferenceDocument {
+  id: string;
+  filename: string;
+  file_kind: 'pdf' | 'docx' | 'txt';
+  document_type: string;
+  deal_id: string | null;
+  deal_name: string;
+  status: DocumentRecord['status'];
+  uploaded_at: string;
+  page_count: number | null;
+  page_source: PageSource;
+  has_evidence: boolean;
+  original_available: boolean;
+}
+
+export interface DocumentReference {
+  document: ReferenceDocument;
+  sections: ReferenceSection[];
+  fields: ReferenceField[];
+}
+
+// ---- agent eval view ----
+
+export type AgentKind = 'document_intake' | 'stage_agent' | 'wiki' | 'borrowing_base';
+
+export interface AgentCall {
+  id: string;
+  created_at: string;
+  agent_kind: AgentKind;
+  agent_name: string;
+  mode: 'llm' | 'rule_based' | 'retrieval' | 'deterministic';
+  status: 'success' | 'fallback' | 'error';
+  error: string;
+  model: string;
+  deal_id: string | null;
+  deal_name: string;
+  document_id: string | null;
+  stage_id: string;
+  triggered_by: string;
+  input_summary: string;
+  latency_ms: number;
+  retrieval_ms: number | null;
+  llm_ms: number | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  cache_read_tokens: number | null;
+  cache_write_tokens: number | null;
+  groundedness: number | null;
+  context_relevance: number | null;
+  answer_relevance: number | null;
+  accuracy: number | null;
+  accuracy_basis: string;
+  human_rating: 'up' | 'down' | null;
+  rated_by: string;
+  rated_at: string | null;
+}
+
+export interface SentenceSupport {
+  sentence: string;
+  support: number;
+  supported: boolean;
+  closest_context: string;
+}
+
+export interface IntakeFieldEval {
+  field_id: string;
+  label: string;
+  original_value: string;
+  value: string;
+  status: ExtractedField['status'];
+  confidence: number;
+  match_method: string;
+  page: number | null;
+  section: string;
+  grounded: boolean | null;
+}
+
+export interface ProposedChangeEval {
+  id: string;
+  field_path: string;
+  new_value: string;
+  status: ChangeStatus;
+  guardrail_status: GuardrailStatus;
+}
+
+export interface AgentCallDetail extends AgentCall {
+  output_summary: string;
+  human_notes: string;
+  details: {
+    sentence_support?: SentenceSupport[];
+    retrieval?: { source: string; title: string; distance: number }[];
+    stop_reason?: string | null;
+    eval_error?: string;
+    [key: string]: unknown;
+  };
+  intake_fields: IntakeFieldEval[];
+  proposed_changes: ProposedChangeEval[];
+}
+
+export interface AgentAggregate {
+  calls: number;
+  success: number;
+  fallback: number;
+  error: number;
+  llm_calls: number;
+  latency_avg_ms: number | null;
+  latency_p50_ms: number | null;
+  latency_p95_ms: number | null;
+  input_tokens: number;
+  output_tokens: number;
+  avg_tokens_per_llm_call: number | null;
+  groundedness: number | null;
+  context_relevance: number | null;
+  answer_relevance: number | null;
+  accuracy: number | null;
+  accuracy_evaluated: number;
+  thumbs_up: number;
+  thumbs_down: number;
+}
+
+export interface AgentGroupAggregate extends AgentAggregate {
+  agent_kind: AgentKind;
+  agent_name: string;
+}
+
+export interface AgentSummary {
+  overall: AgentAggregate;
+  by_agent: AgentGroupAggregate[];
+}
+
+export interface AgentCallFilters {
+  agent_kind?: string;
+  mode?: string;
+  status?: string;
+  deal_id?: string;
+}
+
 export const LIFECYCLE_STAGES: { id: string; label: string }[] = [
   { id: 'origination', label: 'Origination' },
   { id: 'underwriting', label: 'Underwriting' },

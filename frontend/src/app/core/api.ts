@@ -2,9 +2,10 @@ import { Service, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import {
-  AdvanceStageResponse, ApplyFieldsResponse, ApprovalDecision, AuditEntry, Bbc, BbcSubmission, ChainStatus,
-  DealCreate, DealDetail, DealSummary, DocumentRecord, DocumentType, ExtractedField, KeyTerm, PendingChange,
-  StageEvent, StageRunResponse, WikiChatResponse,
+  AdvanceStageResponse, AgentCall, AgentCallDetail, AgentCallFilters, AgentSummary, ApplyFieldsResponse,
+  ApprovalDecision, AuditEntry, Bbc, BbcSubmission, ChainStatus, DealCreate, DealDetail, DealSummary,
+  DocumentRecord, DocumentReference, DocumentType, ExtractedField, KeyTerm, PendingChange, StageEvent,
+  StageRunResponse, WikiChatResponse,
 } from './models';
 
 const BASE = '/api';
@@ -101,6 +102,31 @@ export class Api {
     return this.http.post<ApplyFieldsResponse>(`${BASE}/documents/${docId}/apply-to-deal`, {
       field_ids: fieldIds, deal_field_map: dealFieldMap, proposed_by: proposedBy,
     });
+  }
+
+  getDocumentReference(docId: string): Observable<DocumentReference> {
+    return this.http.get<DocumentReference>(`${BASE}/documents/${docId}/reference`);
+  }
+  documentFileUrl(docId: string): string {
+    return `${BASE}/documents/${docId}/file`;
+  }
+
+  // agent evals
+  listAgentCalls(filters: AgentCallFilters = {}, limit = 300): Observable<AgentCall[]> {
+    const params: Record<string, string> = { limit: String(limit) };
+    for (const [key, value] of Object.entries(filters)) if (value) params[key] = value;
+    return this.http.get<AgentCall[]>(`${BASE}/agent-calls`, { params });
+  }
+  getAgentSummary(filters: Pick<AgentCallFilters, 'agent_kind' | 'deal_id'> = {}): Observable<AgentSummary> {
+    const params: Record<string, string> = {};
+    for (const [key, value] of Object.entries(filters)) if (value) params[key] = value;
+    return this.http.get<AgentSummary>(`${BASE}/agent-calls/summary`, { params });
+  }
+  getAgentCall(id: string): Observable<AgentCallDetail> {
+    return this.http.get<AgentCallDetail>(`${BASE}/agent-calls/${id}`);
+  }
+  rateAgentCall(id: string, rating: 'up' | 'down' | null, notes: string, ratedBy: string): Observable<AgentCall> {
+    return this.http.patch<AgentCall>(`${BASE}/agent-calls/${id}/rating`, { rating, notes, rated_by: ratedBy });
   }
 
   // wiki

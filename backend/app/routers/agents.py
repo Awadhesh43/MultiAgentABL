@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from .. import audit, crud, recommendations, schemas
+from .. import agent_eval, audit, config, crud, recommendations, schemas
 from ..db import get_db
 from ..models import BorrowingBaseCertificate, PendingChange, StageEvent
 
@@ -48,7 +48,14 @@ def run_stage(deal_id: str, stage_id: str, req: schemas.StageRunRequest, db: Ses
         .all()[-5:]
     )
 
-    rec = recommendations.run_stage(deal, stage_id, recent_bbcs, req.extra_context)
+    use_llm = bool(config.ANTHROPIC_API_KEY)
+    with agent_eval.record(
+        db, "stage_agent", recommendations.agent_name_for(stage_id), mode="llm" if use_llm else "rule_based",
+        model=config.DEFAULT_MODEL if use_llm else "", deal_id=deal_id, stage_id=stage_id,
+        input_summary=f"{stage_label} review of {deal.borrower_name}" + (f" -- {req.extra_context}" if req.extra_context else ""),
+    ) as call:
+        rec = recommendations.run_stage(deal, stage_id, recent_bbcs, req.extra_context)
+        call.absorb_stage_result(rec)
 
     existing = (
         db.query(StageEvent)
@@ -60,7 +67,7 @@ def run_stage(deal_id: str, stage_id: str, req: schemas.StageRunRequest, db: Ses
 
     audit.append(
         db, event_type="stage_reviewed", actor=rec["agent_name"], deal_id=deal.id, stage=stage_label,
-        summary=rec["text"][:280], detail={"source": rec["source"]},
+        summary=rec["text"][:280], detail={"source": rec["source"], "agent_call_id": call.row.id},
     )
 
     created = []
@@ -71,6 +78,7 @@ def run_stage(deal_id: str, stage_id: str, req: schemas.StageRunRequest, db: Ses
                 new_value=str(pc["new_value"]), rationale=pc["rationale"], proposed_by=rec["agent_name"],
             )
         )
+    call.update_details(pending_change_ids=[c.id for c in created])
 
     db.commit()
     return schemas.StageRunResponse(

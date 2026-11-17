@@ -15,17 +15,27 @@ load_dotenv(ROOT_DIR / ".env")
 # dependency on the CLI's own file-based deal store.
 sys.path.insert(0, str(ROOT_DIR / "src"))
 
-DB_PATH = BACKEND_DIR / "abl_platform.db"
+# Defaults to BACKEND_DIR so local dev is unchanged; a container sets ABL_DB_DIR
+# to a mounted volume so the SQLite file survives container recreation.
+DB_DIR = Path(os.environ.get("ABL_DB_DIR", str(BACKEND_DIR)))
+DB_DIR.mkdir(parents=True, exist_ok=True)
+DB_PATH = DB_DIR / "abl_platform.db"
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
-UPLOAD_DIR = BACKEND_DIR / "uploaded_docs"
-UPLOAD_DIR.mkdir(exist_ok=True)
+UPLOAD_DIR = Path(os.environ.get("ABL_UPLOAD_DIR", str(BACKEND_DIR / "uploaded_docs")))
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+# Cached "screenshots" of the source chunks a key term was extracted from
+# (see evidence_render.py). Regenerable from the original upload at any time.
+EVIDENCE_DIR = UPLOAD_DIR / "evidence"
 
 # Same physical directory the CLI's knowledge_base.py (src/abl_agents) uses
 # for the curated ABL wiki collection -- semantic_extraction.py stores
 # uploaded-document chunks there too, under a separate collection name, so
-# both share one Chroma store without mixing their content.
-CHROMA_DIR = ROOT_DIR / "chroma_db"
+# both share one Chroma store without mixing their content. ABL_UPLOAD_DIR and
+# ABL_CHROMA_DIR exist so a scratch instance (tests, demos) can run without
+# touching the real uploads or vector index.
+CHROMA_DIR = Path(os.environ.get("ABL_CHROMA_DIR", str(ROOT_DIR / "chroma_db")))
 
 SAMPLE_DOCS_DIR = BACKEND_DIR / "sample_documents"
 

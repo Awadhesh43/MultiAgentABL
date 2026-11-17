@@ -77,6 +77,23 @@ guardrail tier is visible immediately without triggering a single agent run:
   `.pdf`, or `.docx` file; the parser extracts a value and a confidence score per key term; a
   human reviews, edits, and confirms each field; confirmed fields can then be mapped onto a deal
   attribute and staged as a normal HITL change.
+- **Reference view** (`/documents/:id/reference`) — for human evaluation of the Document Intake
+  Agent. For every extracted key term it shows the section and page the value was read from, a
+  screenshot of that passage, the passage text with the value highlighted, and the other passages
+  retrieval considered (with why each was passed over). Reviewers can confirm, correct or reject
+  right there. For **PDFs** the screenshot is the real page, with the passage highlighted in yellow
+  and the value boxed in orange, and page numbers are exact. **Word files don't store page numbers**:
+  pages are approximate (from the page breaks Word last saved) and the screenshot is a rendering of
+  the extracted text around the passage, and the view says so. Upload a PDF for exact pages. Documents
+  uploaded before this view existed show no evidence and need to be uploaded again.
+- **Agent evals** (`/agent-evals`) — every agent call (Document Intake, the stage agents, the ABL
+  Wiki, Borrowing Base) with its latency (retrieval / LLM / other), token usage, whether it used an
+  LLM, and quality scores: **groundedness**, **context relevance**, **answer relevance** and
+  **accuracy**. Open a call to see what the agent was asked and answered, which sentences were
+  flagged as unsupported, the extracted values with their sources, and to rate it thumbs up/down
+  (recorded in the audit trail). Groundedness and relevance are embedding-similarity proxies, not
+  an LLM judge; accuracy is never guessed — it comes from human actions (values a reviewer accepted
+  unchanged, changes an approver approved, or your rating). See "How each metric is scored" on the page.
 - **Audit trail** (`/audit`) — every agent recommendation, human decision, document upload, and
   key-term addition, hash-chained end to end with a live integrity check.
 - **ABL Wiki** (`/wiki`) — the same retrieval-grounded chat agent as the CLI demo, now with a

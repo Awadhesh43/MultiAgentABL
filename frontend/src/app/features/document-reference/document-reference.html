@@ -1,0 +1,292 @@
+<div class="page">
+  <a routerLink="/documents" class="back-link"><mat-icon>arrow_back</mat-icon> Document Intake</a>
+
+  @if (loading()) {
+    <div class="loading"><mat-spinner diameter="32"></mat-spinner></div>
+  } @else if (error()) {
+    <p class="notice notice-warn">{{ error() }}</p>
+  } @else if (reference(); as r) {
+    <header class="page-header">
+      <div>
+        <h1>{{ r.document.filename }}</h1>
+        <p class="subtitle">
+          Reference view &middot; {{ r.document.document_type }} &middot;
+          {{ r.document.deal_name || 'Unassigned' }} &middot; uploaded {{ r.document.uploaded_at | date: 'MMM d, y, HH:mm:ss' }}
+          &middot; {{ reviewedCount() }} of {{ r.fields.length }} terms reviewed
+        </p>
+      </div>
+      @if (r.document.original_available) {
+        <a mat-stroked-button [href]="fileUrl()" target="_blank" rel="noopener">
+          <mat-icon>open_in_new</mat-icon> Open original
+        </a>
+      }
+    </header>
+
+    @switch (r.document.page_source) {
+      @case ('pdf') {
+        <p class="notice notice-ok">
+          <mat-icon>verified</mat-icon>
+          Page numbers are exact and each screenshot is the real page, with the source passage highlighted in yellow
+          and the extracted value boxed in orange.
+        </p>
+      }
+      @case ('docx_markers') {
+        <p class="notice notice-warn">
+          <mat-icon>info</mat-icon>
+          Word files don't store page numbers. Pages marked ~ come from the page breaks Word last saved, so they can
+          differ from the printed layout, and screenshots are a rendering of the extracted text rather than the original
+          page. Upload the document as a PDF for exact pages and true page screenshots.
+        </p>
+      }
+      @default {
+        <p class="notice notice-warn">
+          <mat-icon>info</mat-icon>
+          @if (r.document.file_kind === 'docx') {
+            This Word file has no saved page breaks, so page numbers aren't available.
+          } @else {
+            This format has no pages.
+          }
+          Screenshots are a rendering of the extracted text around the passage. Upload a PDF for exact pages.
+        </p>
+      }
+    }
+
+    @if (!r.document.has_evidence) {
+      <p class="notice notice-warn">
+        <mat-icon>history</mat-icon>
+        No source evidence was recorded for this document (it was uploaded before the reference view existed).
+        Upload it again to see where each value comes from.
+      </p>
+    }
+
+    <div class="layout">
+      <aside class="side">
+        <mat-card class="outline-card">
+          <mat-card-header>
+            <mat-card-title>Sections</mat-card-title>
+            <mat-card-subtitle>
+              {{ r.sections.length }} found @if (r.document.page_count) { &middot; {{ r.document.page_count }} pages }
+              &middot; click to filter terms
+            </mat-card-subtitle>
+          </mat-card-header>
+          <mat-card-content>
+            <ul class="outline">
+              @for (s of r.sections; track s.title) {
+                <li>
+                  <button type="button" class="outline-item" [class.active]="sectionFilter() === s.title" (click)="toggleSection(s.title)">
+                    <span class="outline-title">
+                      @if (s.title === noSection) {
+                        <em>{{ sectionLabel(s.title) }}</em>
+                      } @else {
+                        @for (part of sectionParts(s.title); track $index; let last = $last) {
+                          <span [class.crumb-parent]="!last" [class.crumb-leaf]="last">{{ part }}</span>
+                          @if (!last) { <mat-icon class="crumb-sep">chevron_right</mat-icon> }
+                        }
+                      }
+                    </span>
+                    <span class="outline-meta">
+                      @if (pageRange(s, r.document.page_source === 'docx_markers')) {
+                        <span class="chip">{{ pageRange(s, r.document.page_source === 'docx_markers') }}</span>
+                      }
+                      @if (s.field_labels.length) {
+                        <span class="chip chip-terms" [matTooltip]="s.field_labels.join(', ')">{{ s.field_labels.length }} term{{ s.field_labels.length === 1 ? '' : 's' }}</span>
+                      }
+                    </span>
+                  </button>
+                </li>
+              }
+            </ul>
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card class="terms-card">
+          <mat-card-header>
+            <mat-card-title>Key terms</mat-card-title>
+            <mat-card-subtitle>
+              {{ visibleFields().length }} shown
+              @if (sectionFilter() !== null) { &middot; <button type="button" class="link-btn" (click)="sectionFilter.set(null)">clear section filter</button> }
+            </mat-card-subtitle>
+          </mat-card-header>
+          <mat-card-content>
+            <div class="term-list">
+              @for (f of visibleFields(); track f.field_id) {
+                <button type="button" class="term-item" [class.active]="selected()?.field_id === f.field_id" (click)="selectField(f)">
+                  <span class="term-top">
+                    <span class="term-label">{{ f.label }}</span>
+                    @if (f.status !== 'pending_review') {
+                      <app-status-badge [status]="f.status === 'confirmed' ? 'approved' : 'rejected'" />
+                    }
+                  </span>
+                  <span class="term-value mono">{{ f.value || 'not found' }}</span>
+                  <span class="term-meta">
+                    <span class="badge" [class]="confidenceClass(f.confidence)">{{ f.confidence | percent: '1.0-0' }}</span>
+                    @if (sourceOf(f); as src) {
+                      <span class="chip">{{ pageLabel(src) }}</span>
+                    } @else {
+                      <span class="chip chip-none">no source</span>
+                    }
+                    @if (f.grounded === false) {
+                      <mat-icon class="warn-icon" matTooltip="The value was not found in its source passage">warning</mat-icon>
+                    }
+                  </span>
+                </button>
+              } @empty {
+                <p class="empty">No key terms were sourced from this section.</p>
+              }
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </aside>
+
+      <section class="detail">
+        @if (selected(); as f) {
+          <mat-card class="evidence-card">
+            <mat-card-header>
+              <mat-card-title>{{ f.label }}</mat-card-title>
+              <mat-card-subtitle>
+                {{ f.data_type }} &middot; extracted by {{ f.match_method.replace('_', ' ') }}
+              </mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content>
+              <div class="value-row">
+                <div class="value-block">
+                  <span class="k">Extracted value</span>
+                  <span class="big-value mono">{{ f.original_value || 'nothing found' }}</span>
+                  @if (f.edited) {
+                    <span class="edited-note">Reviewer changed this to <strong class="mono">{{ f.value }}</strong></span>
+                  }
+                </div>
+                <div class="value-badges">
+                  <span class="badge" [class]="confidenceClass(f.confidence)">{{ f.confidence | percent: '1.0-0' }} confidence</span>
+                  @if (sourceOf(f); as src) {
+                    @if (src.similarity !== null) {
+                      <span class="badge badge-pending" matTooltip="How closely this passage matched the key term when it was searched for">{{ src.similarity | percent: '1.0-0' }} match</span>
+                    }
+                  }
+                  @if (f.grounded === true) {
+                    <span class="badge badge-approved" matTooltip="The value appears in the passage it was read from"><mat-icon class="inline-icon">check</mat-icon> in source</span>
+                  } @else if (f.grounded === false) {
+                    <span class="badge badge-rejected"><mat-icon class="inline-icon">warning</mat-icon> not in source</span>
+                  }
+                </div>
+              </div>
+
+              @if (f.status === 'pending_review') {
+                <div class="review-row">
+                  <mat-form-field appearance="outline" class="review-input">
+                    <mat-label>Correct value (edit if the agent got it wrong)</mat-label>
+                    <input matInput [ngModel]="valueFor(f)" (ngModelChange)="setValue(f, $event)" />
+                  </mat-form-field>
+                  <button mat-flat-button color="primary" [disabled]="saving()" (click)="review(f, true)">
+                    <mat-icon>check</mat-icon> Confirm
+                  </button>
+                  <button mat-stroked-button [disabled]="saving()" (click)="review(f, false)">
+                    <mat-icon>close</mat-icon> Reject
+                  </button>
+                </div>
+              } @else {
+                <p class="reviewed-note">
+                  <app-status-badge [status]="f.status === 'confirmed' ? 'approved' : 'rejected'" />
+                  by {{ f.reviewed_by || 'a reviewer' }}
+                </p>
+              }
+
+              <h3 class="section-title">Where it came from</h3>
+              @if (sourceOf(f); as src) {
+                <div class="where">
+                  <span class="where-chip" [class.approx]="src.page_source === 'docx_markers'">
+                    <mat-icon>description</mat-icon>{{ pageLabel(src) }}
+                  </span>
+                  <span class="where-chip where-section">
+                    <mat-icon>segment</mat-icon>
+                    @if (src.section) {
+                      @for (part of sectionParts(src.section); track $index; let last = $last) {
+                        <span>{{ part }}</span>@if (!last) { <mat-icon class="crumb-sep">chevron_right</mat-icon> }
+                      }
+                    } @else {
+                      Before the first heading
+                    }
+                  </span>
+                  <span class="where-chip"><mat-icon>notes</mat-icon>{{ src.granularity === 'line' ? 'single line' : 'paragraph' }}</span>
+                </div>
+
+                <figure class="shot">
+                  @if (isBroken(src)) {
+                    <p class="notice notice-warn">The screenshot could not be generated for this passage.</p>
+                  } @else {
+                    <img [src]="imageSrc(src)" [alt]="'Source passage for ' + f.label" (error)="markBroken(src)" />
+                  }
+                  <figcaption>
+                    <span>
+                      @if (isWholePage(src)) { Whole page } @else { Source passage }
+                      @if (r.document.file_kind !== 'pdf') { (rendered from the extracted text) }
+                    </span>
+                    @if (r.document.file_kind === 'pdf') {
+                      <button type="button" class="link-btn" (click)="toggleWholePage(src)">
+                        {{ isWholePage(src) ? 'Show just the passage' : 'Show the whole page' }}
+                      </button>
+                    }
+                  </figcaption>
+                </figure>
+
+                <div class="chunk">
+                  <span class="k">Passage text</span>
+                  <p class="chunk-text mono">
+                    @for (part of textParts(src.text, src.value_text); track $index) {
+                      @if (part.hit) { <mark>{{ part.text }}</mark> } @else { {{ part.text }} }
+                    }
+                  </p>
+                </div>
+              } @else {
+                <p class="notice notice-warn">
+                  <mat-icon>search_off</mat-icon>
+                  @if (f.value) {
+                    No source passage could be located for this value.
+                  } @else {
+                    The agent found no passage with a value for this term.
+                  }
+                </p>
+              }
+
+              @if (otherEvidence(f).length) {
+                <h3 class="section-title">Other passages considered <span class="count">{{ otherEvidence(f).length }}</span></h3>
+                <p class="hint">
+                  Retrieval returns the closest passages to the key term; the agent takes the first one that yields a
+                  value of the right type. These are the rest, closest first.
+                </p>
+                <div class="others">
+                  @for (ev of otherEvidence(f); track ev.evidence_id; let i = $index) {
+                    <div class="other">
+                      <div class="other-top">
+                        <span class="other-rank">#{{ i + 1 }}</span>
+                        @if (ev.similarity !== null) {
+                          <span class="badge badge-pending">{{ ev.similarity | percent: '1.0-0' }} match</span>
+                        }
+                        <span class="outcome" [class.outcome-skip]="ev.outcome !== 'not_examined'">{{ outcomeLabel(ev) }}</span>
+                        <span class="chip">{{ pageLabel(ev) }}</span>
+                        <button type="button" class="link-btn push" (click)="toggleOther(ev)">
+                          {{ isOpen(ev) ? 'Hide screenshot' : 'Show screenshot' }}
+                        </button>
+                      </div>
+                      @if (ev.section) {
+                        <div class="other-section">{{ sectionParts(ev.section).join(' › ') }}</div>
+                      }
+                      <p class="other-text mono">{{ ev.text }}</p>
+                      @if (isOpen(ev)) {
+                        <figure class="shot shot-small">
+                          <img [src]="ev.image_url" [alt]="'Candidate passage for ' + f.label" loading="lazy" />
+                        </figure>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </mat-card-content>
+          </mat-card>
+        } @else {
+          <p class="pick-hint">Select a key term to see where in the document its value came from.</p>
+        }
+      </section>
+    </div>
+  }
+</div>

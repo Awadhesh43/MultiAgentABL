@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from .. import audit, config, crud, document_intake_agent, extraction, guardrails, schemas
+from .. import agent_eval, audit, config, crud, document_intake_agent, document_structure, evidence, guardrails, schemas
 from ..db import get_db
 from ..models import Document, DocumentType, ExtractedField, KeyTerm, PendingChange
 
@@ -182,9 +182,10 @@ async def upload_document(
     dest.write_bytes(content)
 
     try:
-        text = extraction.extract_text(file.filename, content)
+        extracted = document_structure.extract_document(file.filename, content)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(422, f"Could not parse file: {exc}")
+    text = extracted.text
 
     key_terms = [
         {"id": t.id, "label": t.label, "aliases": t.aliases, "data_type": t.data_type}
@@ -199,14 +200,28 @@ async def upload_document(
     db.add(doc)
     db.flush()  # assigns doc.id, which scopes the semantic chunk search below
 
-    candidates = document_intake_agent.run(doc.id, file.filename, text, key_terms)
-
-    for c in candidates:
-        db.add(ExtractedField(
-            document_id=doc.id, key_term_id=c.key_term_id, label=c.label,
-            extracted_value=c.value, confidence=c.confidence, match_method=c.match_method,
-            status="pending_review",
+    with agent_eval.record(
+        db, "document_intake", "Document Intake Agent", mode="retrieval", deal_id=deal_id, document_id=doc.id,
+        triggered_by=uploaded_by, input_summary=f"{file.filename} ({doc_type.name}): {len(key_terms)} key terms",
+    ) as call:
+        result = document_intake_agent.run(doc.id, file.filename, extracted, key_terms)
+        call.eval_input = {"intake": result, "key_terms": key_terms}
+        call.set_output("\n".join(
+            f"{c.label}: {c.value or '(not found)'}  [{c.match_method}, {c.confidence:.0%}]" for c in result.candidates
         ))
+    candidates = result.candidates
+
+    fields = []
+    for c in candidates:
+        field = ExtractedField(
+            document_id=doc.id, key_term_id=c.key_term_id, label=c.label,
+            extracted_value=c.value, original_value=c.value, confidence=c.confidence, match_method=c.match_method,
+            status="pending_review",
+        )
+        db.add(field)
+        fields.append(field)
+    db.flush()
+    evidence.attach_evidence(db, doc.id, result, fields)
 
     found = sum(1 for c in candidates if c.value)
     method_counts: dict[str, int] = {}
@@ -215,7 +230,10 @@ async def upload_document(
     audit.append(
         db, event_type="document_uploaded", actor=uploaded_by, deal_id=deal_id or "",
         summary=f"Uploaded {file.filename} as {doc_type.name}: {found}/{len(candidates)} fields extracted",
-        detail={"document_id": doc.id, "document_type": doc_type.name, "extraction_methods": method_counts},
+        detail={
+            "document_id": doc.id, "document_type": doc_type.name, "extraction_methods": method_counts,
+            "agent_call_id": call.row.id,
+        },
     )
 
     db.commit()
