@@ -1,6 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { DatePipe, PercentPipe } from '@angular/common';
-import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -21,7 +20,7 @@ import { StatusBadge } from '../../shared/status-badge/status-badge';
 @Component({
   selector: 'app-documents',
   imports: [
-    RouterLink, FormsModule, MatCardModule, MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule,
+    FormsModule, MatCardModule, MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule,
     MatSelectModule, MatCheckboxModule, MatExpansionModule, MatProgressSpinnerModule, DatePipe, PercentPipe, StatusBadge,
   ],
   templateUrl: './documents.html',
