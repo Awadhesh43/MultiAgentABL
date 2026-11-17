@@ -8,7 +8,13 @@ import {
   StageRunResponse, WikiChatResponse,
 } from './models';
 
-const BASE = '/api';
+declare global {
+  interface Window {
+    __ABL_CONFIG__?: { apiBaseUrl?: string };
+  }
+}
+
+const BASE = window.__ABL_CONFIG__?.apiBaseUrl?.replace(/\/$/, '') || '/api';
 
 @Service()
 export class Api {
